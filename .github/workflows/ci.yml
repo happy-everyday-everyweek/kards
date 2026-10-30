@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     name: Test
@@ -58,9 +61,34 @@ jobs:
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/*.apk out/kards-demo.apk
+          ls -lh out/
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: kards-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: out/kards-demo.apk
           if-no-files-found: error
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: demo-latest
+          name: KARDS Demo (latest)
+          body: |
+            自动构建的 Debug APK。
+
+            直链：
+            https://github.com/happy-everyday-everyweek/kards/releases/download/demo-latest/kards-demo.apk
+
+            镜像：
+            https://ghfast.top/https://github.com/happy-everyday-everyweek/kards/releases/download/demo-latest/kards-demo.apk
+          files: out/kards-demo.apk
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
