@@ -25,7 +25,12 @@ import com.kards.core.UnitType
  * 规则骨架全部来自 core 里的 [Engine]（同一套代码被单元测试覆盖），
  * 这里只负责：把 UI 操作翻译成引擎调用、驱动 Bot 出牌、维护 Compose 可观察状态。
  */
-class GameController(private val playerNation: Nation = Nation.GERMANY) {
+class GameController(
+    private val campaign: Campaign? = null,
+    private val customDeck: Deck? = null,
+    private val onVictory: () -> Unit = {}
+) {
+    private val playerNation = customDeck?.nation ?: campaign?.nation ?: Nation.GERMANY
 
     /** 玩家选中的手牌（用于部署/使用）。 */
     var selectedHandIndex by mutableStateOf(-1)
@@ -58,7 +63,7 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
     }
 
     fun newGame() {
-        val p1Deck = buildDeck(playerNation)
+        val p1Deck = customDeck ?: buildDeck(playerNation)
         val botNation = botNationFor(playerNation)
         val p2Deck = buildDeck(botNation)
 
@@ -76,7 +81,7 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
     }
 
     private fun botNationFor(player: Nation): Nation =
-        if (player == Nation.USSR) Nation.GERMANY else Nation.USSR
+        campaign?.enemy ?: if (player == Nation.USSR) Nation.GERMANY else Nation.USSR
 
     /**
      * 用真实卡牌拼一套 40 张卡组：1 张总部 + 39 张。
@@ -118,7 +123,10 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
         revision++
         if (engine.finished && resultText == null) {
             resultText = when (engine.winner) {
-                Side.P1 -> "你赢了"
+                Side.P1 -> {
+                if (campaign != null) onVictory()
+                "战役胜利"
+            }
                 Side.P2 -> "Bot 获胜"
                 else -> "对局结束"
             }
@@ -270,42 +278,67 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
 
     private fun botTurn() {
         val bot = engine.p2
-        // 简单策略：能出的牌都出，能攻击就攻击
         var guard = 0
-        while (guard++ < 40) {
-            val playable = bot.hand
-                .mapIndexed { i, h -> i to h.card }
-                .filter { it.second.cost <= bot.kredits }
-                .sortedBy { it.second.cost }
+        // 优先用高费高质量单位铺满费用曲线，而不是无脑从最低费开始出。
+        while (guard++ < 30) {
+            val playable = bot.hand.mapIndexed { i, h -> i to h.card }
+                .filter { it.second.type == CardType.UNIT && it.second.cost <= bot.kredits }
+                .sortedWith(compareByDescending<Pair<Int, Card>> {
+                    it.second.cost + it.second.attack + it.second.defense
+                }.thenBy { it.second.cost })
             if (playable.isEmpty()) break
-            val (idx, card) = playable.first()
-            if (card.type == CardType.UNIT) {
-                val line = if (bot.frontHasRoom() && bot.front.size < 2) Line.FRONT else Line.SUPPORT
-                if (engine.deployUnit(Side.P2, card, line) !is ActionResult.Ok) {
-                    if (engine.deployUnit(Side.P2, card, Line.SUPPORT) !is ActionResult.Ok) break
-                }
-                bot.hand.removeAt(idx)
-            } else {
-                applyOrder(card, Side.P2)
+            val (index, card) = playable.first()
+            val line = if (engine.frontOwner != Side.P1 && bot.frontHasRoom() &&
+                card.unitType != UnitType.ARTILLERY) Line.FRONT else Line.SUPPORT
+            val result = engine.deployUnit(Side.P2, card, line)
+            if (result !is ActionResult.Ok &&
+                engine.deployUnit(Side.P2, card, Line.SUPPORT) !is ActionResult.Ok) break
+            bot.hand.removeAt(index)
+            refresh()
+        }
+
+        // 支援阵线的近战单位主动争夺空前线，保留行动点用于攻击。
+        bot.support.filter { it.unitType == UnitType.INFANTRY || it.tankLike }.forEach { unit ->
+            if (engine.frontOwner != Side.P1 && bot.frontHasRoom()) {
+                engine.moveUnit(Side.P2, unit, Line.FRONT)
+            }
+        }
+
+        var attacks = 0
+        while (!engine.finished && attacks++ < 30) {
+            val action = bot.allUnits().flatMap { attacker ->
+                val targets = engine.p1.allUnits().map { target ->
+                    val canWin = attacker.attack >= target.defense + target.armorValue
+                    val survives = attacker.defense > target.attack || !target.isAlive
+                    val score = when {
+                        canWin && survives -> 1000 + target.attack * 8 + target.defense
+                        canWin -> 450 + target.attack * 6
+                        target.attack == 0 -> 150
+                        else -> -200 + attacker.attack - target.attack
+                    }
+                    BotAttack(attacker, Target.EnemyUnit(target), score)
+                } + BotAttack(
+                    attacker, Target.EnemyHq(Side.P1),
+                    if (engine.p1.hq.defense <= attacker.attack) 10000 else 500 + attacker.attack * 3
+                )
+                targets.filter { engine.canAttack(Side.P2, it.attacker, it.target) is ActionResult.Ok }
+            }.maxByOrNull { it.score }
+            if (action == null || (action.score < 0 && engine.p1.hq.defense > 6)) break
+            when (val target = action.target) {
+                is Target.EnemyUnit -> engine.attack(Side.P2, action.attacker, target.unit)
+                is Target.EnemyHq -> engine.attackHq(Side.P2, action.attacker)
             }
             refresh()
         }
-        // Bot 进攻
-        bot.allUnits().forEach { u ->
-            val targets = engine.p1.allUnits()
-            if (targets.isNotEmpty()) {
-                val t = targets.minByOrNull { it.defense }
-                if (t != null) engine.attack(Side.P2, u, t)
-            } else {
-                engine.attackHq(Side.P2, u)
-            }
-            refresh()
-        }
-        if (engine.finished) return
-        // endTurn 内部会切换到对方并开始其回合，不需要再额外 beginTurn
-        engine.endTurn()
+        if (!engine.finished) engine.endTurn()
         refresh()
     }
+
+    private data class BotAttack(
+        val attacker: UnitInstance,
+        val target: Target,
+        val score: Int
+    )
 
     // —————————————————— 供 UI 显示 ——————————————————
 

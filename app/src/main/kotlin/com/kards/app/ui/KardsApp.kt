@@ -53,7 +53,34 @@ import com.kards.core.UnitInstance
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KardsApp() {
-    val game = remember { GameController() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val progress = remember { com.kards.app.game.CampaignProgress(context) }
+    val editor = remember { com.kards.app.game.DeckEditorState(context) }
+    var screen by remember { androidx.compose.runtime.mutableStateOf("home") }
+    var campaign by remember { androidx.compose.runtime.mutableStateOf<com.kards.app.game.Campaign?>(null) }
+    var progressRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    when (screen) {
+        "home" -> HomeScreen(progress.completedCount(), editor.isReady,
+            { screen = "campaigns" }, { screen = "deck" }, { campaign = null; screen = "battle" })
+        "campaigns" -> CampaignScreen(progress, { campaign = it; screen = "battle" }, { screen = "home" })
+        "deck" -> DeckEditorScreen(editor) { screen = "home" }
+        else -> {
+            progressRevision
+            BattleScreen(campaign, editor.toDeck(), { if (campaign != null) { progress.complete(campaign!!.id); progressRevision++ } }) {
+                screen = if (campaign != null) "campaigns" else "home"
+            }
+        }
+    }
+}
+
+@Composable
+private fun BattleScreen(
+    campaign: com.kards.app.game.Campaign?,
+    deck: com.kards.core.Deck?,
+    onVictory: () -> Unit,
+    onExit: () -> Unit
+) {
+    val game = remember(campaign, deck) { GameController(campaign, deck, onVictory) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(game.revision, game.toast) {
@@ -70,13 +97,13 @@ fun KardsApp() {
                 title = {
                     Column {
                         Text("KARDS", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "人机对战 · 离线规则引擎",
+Text(campaign?.title ?: "快速人机对战 · 离线规则引擎",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
+                navigationIcon = { TextButton(onClick = onExit) { Text("退出") } },
                 actions = {
                     IconButton(onClick = { game.newGame() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "重开")
