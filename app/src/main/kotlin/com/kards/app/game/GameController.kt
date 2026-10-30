@@ -131,7 +131,7 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
     val enemyHqDefense: Int get() = engine.p2.hq.defense
     val myKredits: Int get() = engine.p1.kredits
     val mySlots: Int get() = engine.p1.slots
-    val isMyTurn: Boolean get() = engine.currentSide == Side.P1 && !engine.finished
+    val isMyTurn: Boolean get() = engine.active == Side.P1 && !engine.finished
 
     // —————————————————— 玩家操作 ——————————————————
 
@@ -195,8 +195,8 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
             OrderEffect.SUPPRESS_ONE -> foe.allUnits().firstOrNull()?.let { engine.suppress(it) }
             OrderEffect.PIN_ALL -> foe.allUnits().forEach { engine.pin(it) }
             OrderEffect.REPAIR_ALL -> p.allUnits().forEach { engine.repair(it) }
-            OrderEffect.BUFF_ALL -> p.allUnits().forEach { it.attack += 1; it.defense += 1 }
-            OrderEffect.HEAL_HQ -> p.hq.defense += 3
+            OrderEffect.BUFF_ALL -> p.allUnits().forEach { it.attackBonus += 1; it.maxDefenseBonus += 1 }
+            OrderEffect.HEAL_HQ -> p.hq.maxDefenseBonus += 3
             OrderEffect.RETREAT_ONE -> foe.allUnits().firstOrNull()?.let { engine.retreat(it) }
             else -> Unit // 其余效果在 Demo 里按无附加处理
         }
