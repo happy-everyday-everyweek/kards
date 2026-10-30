@@ -184,6 +184,20 @@ object CardPool {
 
     val GER_INF_89 get() = INF_89
     val USA_INF_432 get() = INF_432
+    val GER_TANK_35T get() = need(Nation.GERMANY, "35(t)坦克")
+    val GER_PZGREN_59 get() = need(Nation.GERMANY, "第59装甲掷弹兵团")
+    val GER_STUG3F get() = need(Nation.GERMANY, "三号突击炮F型")
+    val GER_MOBILIZE_119 get() = need(Nation.GERMANY, "第119掷弹兵团")
+    val GER_ORDER_CONVERT get() = need(Nation.GERMANY, "转变攻击")
+    val GER_ORDER_EXILE get() = need(Nation.GERMANY, "老兔子")
+    val GER_ORDER_RETREAT get() = need(Nation.GERMANY, "战术打击")
+    val UK_INF_GUARD get() = need(Nation.UK, "冷溪卫队")
+    val UK_INF_SUFFOLK get() = need(Nation.UK, "米色团")
+    val USSR_INF_SHOCK get() = need(Nation.USSR, "海军步兵第6旅")
+    val JPN_INF_AMBUSH get() = need(Nation.JAPAN, "搜索第三十三联队")
+    val FRA_INF_RESIST get() = need(Nation.FRANCE, "基弗突击队")
+    val GER_INF_89 get() = INF_89
+    val USA_INF_432 get() = INF_432
     val GER_ALPINE_141 get() = need(Nation.GERMANY, "第141山地猎兵团")
     val GER_BF110 get() = need(Nation.GERMANY, "Bf 110 C")
     val GER_COVERT_39 get() = need(Nation.GERMANY, "第39装甲掷弹兵团")
