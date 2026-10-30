@@ -171,8 +171,9 @@ class GameController(
     fun deploySelected(line: Line) {
         val idx = selectedHandIndex
         if (idx !in hand.indices) return
-        val card = hand[idx].card
-        val r = engine.deployUnit(Side.P1, card, line)
+        val selected = hand[idx]
+        val card = selected.card
+        val r = engine.deployUnit(Side.P1, card, line, selected.cost)
         when (r) {
             is ActionResult.Ok -> {
                 // 引擎只负责战场结算，手牌移除由调用方处理，并从指定位置删掉这一张
@@ -203,18 +204,35 @@ class GameController(
 
     private fun applyOrder(card: Card, side: Side) {
         val p = engine.player(side)
-        if (!p.canPay(card.cost)) {
-            say("指挥点不足（需要 ${card.cost}）")
+        val handCard = p.hand.firstOrNull { it.card.id == card.id }
+        val cost = handCard?.cost ?: card.cost
+        when (val r = engine.playOrder(side, card, costOverride = cost)) {
+            is ActionResult.Ok -> {
+                val hi = p.hand.indexOfFirst { it.card.id == card.id }
+                if (hi >= 0) p.hand.removeAt(hi)
+                say("使用了 ${card.name}")
+            }
+            is ActionResult.Rejected -> say(r.reason)
+        }
+    }
+
+    /** 激活手牌中的反制：支付费用并挂起，等待对手触发。 */
+    fun playSelectedCounter() {
+        val idx = selectedHandIndex
+        if (idx !in hand.indices) return
+        val card = hand[idx].card
+        if (card.type != CardType.COUNTERMEASURE) {
+            say("这不是反制卡")
             return
         }
-        p.pay(card.cost)
-        // 只从手牌移除一张同名卡，不能一次删光
-        val hi = p.hand.indexOfFirst { it.card.id == card.id }
-        if (hi >= 0) p.hand.removeAt(hi)
-        p.discardPile += card
-        val foe = engine.player(side.opponent)
-        com.kards.core.CardEffectRuntime.execute(engine, side, card)
-        say("使用了 ${card.name}")
+        when (val r = engine.activateCounter(Side.P1, card)) {
+            is ActionResult.Ok -> {
+                if (idx in engine.p1.hand.indices) engine.p1.hand.removeAt(idx)
+                selectedHandIndex = -1
+                say("已激活反制 ${card.name}")
+            }
+            is ActionResult.Rejected -> say(r.reason)
+        }
     }
 
     /** 移动选中的单位到另一条阵线。 */
@@ -267,20 +285,38 @@ class GameController(
         var guard = 0
         // 优先用高费高质量单位铺满费用曲线，而不是无脑从最低费开始出。
         while (guard++ < 30) {
-            val playable = bot.hand.mapIndexed { i, h -> i to h.card }
-                .filter { it.second.type == CardType.UNIT && it.second.cost <= bot.kredits }
-                .sortedWith(compareByDescending<Pair<Int, Card>> {
-                    it.second.cost + it.second.attack + it.second.defense
+            val playable = bot.hand.mapIndexed { i, h -> i to h }
+                .filter { it.second.card.type == CardType.UNIT && it.second.cost <= bot.kredits }
+                .sortedWith(compareByDescending<Pair<Int, HandCard>> {
+                    it.second.card.cost + it.second.card.attack + it.second.card.defense
                 }.thenBy { it.second.cost })
             if (playable.isEmpty()) break
-            val (index, card) = playable.first()
+            val (index, handCard) = playable.first()
+            val card = handCard.card
             val line = if (engine.frontOwner != Side.P1 && bot.frontHasRoom() &&
                 card.unitType != UnitType.ARTILLERY) Line.FRONT else Line.SUPPORT
-            val result = engine.deployUnit(Side.P2, card, line)
+            val result = engine.deployUnit(Side.P2, card, line, handCard.cost)
             if (result !is ActionResult.Ok &&
-                engine.deployUnit(Side.P2, card, Line.SUPPORT) !is ActionResult.Ok) break
+                engine.deployUnit(Side.P2, card, Line.SUPPORT, handCard.cost) !is ActionResult.Ok) break
             bot.hand.removeAt(index)
             refresh()
+        }
+
+        // 余下费用继续使用指令；反制留待玩家手动激活，Bot 不盲目消耗。
+        var orderGuard = 0
+        while (orderGuard++ < 10) {
+            val playableOrder = bot.hand.mapIndexed { i, h -> i to h }
+                .filter { it.second.card.type == CardType.ORDER && it.second.cost <= bot.kredits }
+                .maxByOrNull { it.second.cost }
+                ?: break
+            val (index, handCard) = playableOrder
+            if (engine.playOrder(Side.P2, handCard.card, costOverride = handCard.cost) !is ActionResult.Ok) break
+            if (index in bot.hand.indices) bot.hand.removeAt(index)
+            refresh()
+        }
+        if (engine.finished) {
+            refresh()
+            return
         }
 
         // 支援阵线的近战单位主动争夺空前线，保留行动点用于攻击。

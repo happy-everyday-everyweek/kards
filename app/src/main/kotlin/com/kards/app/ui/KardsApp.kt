@@ -386,9 +386,13 @@ private fun ActionBar(game: GameController) {
                     FilledTonalButton(onClick = { game.playSelectedOrder() }) {
                         Text("使用指令")
                     }
+                } else if (card.type == CardType.COUNTERMEASURE) {
+                    FilledTonalButton(onClick = { game.playSelectedCounter() }) {
+                        Text("激活反制")
+                    }
                 } else {
                     Text(
-                        "反制卡暂不支持手动激活",
+                        "该卡暂时无法使用",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -418,7 +422,7 @@ private fun HandRow(game: GameController) {
             itemsIndexed(game.hand) { index, hc ->
                 val card = hc.card
                 val selected = game.selectedHandIndex == index
-                val affordable = card.cost <= game.myKredits
+                val affordable = hc.cost <= game.myKredits
                 Card(
                     modifier = Modifier
                         .width(96.dp)
@@ -454,7 +458,7 @@ private fun HandRow(game: GameController) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "${card.cost}",
+                                    "${hc.cost}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold

@@ -42,6 +42,7 @@ enum class CounterTrigger(val cn: String) {
     ENEMY_PLAYS_ORDER("敌方使用指令时"),
     ENEMY_DAMAGES_HQ("敌方对总部造成伤害时"),
     ENEMY_MOVES_TO_FRONT("敌方进入前线时"),
+    ENEMY_UNIT_DESTROYED("敌方单位被消灭时"),
     NONE("无")
 }
 
@@ -140,7 +141,22 @@ object EffectTable {
                 .map { "${it.first.cn}「${it.second}」" }
 
     fun effectOf(card: Card): OrderEffect = orders[card.id] ?: OrderEffect.NO_OP
-    fun triggerOf(card: Card): CounterTrigger = counters[card.id] ?: CounterTrigger.NONE
+    fun triggerOf(card: Card): CounterTrigger = counters[card.id] ?: inferTrigger(card.effectText)
+
+    /**
+     * 未手工登记的反制按卡面原文判定时机。只使用文本中明确出现的条件词，
+     * 无法识别时返回 [CounterTrigger.NONE]，不默认挂到任一事件上。
+     */
+    private fun inferTrigger(text: String): CounterTrigger = when {
+        text.isBlank() -> CounterTrigger.NONE
+        "部署" in text -> CounterTrigger.ENEMY_DEPLOYS_UNIT
+        "攻击" in text -> CounterTrigger.ENEMY_ATTACKS
+        "使用指令" in text -> CounterTrigger.ENEMY_PLAYS_ORDER
+        "总部" in text && "伤害" in text -> CounterTrigger.ENEMY_DAMAGES_HQ
+        "前线" in text -> CounterTrigger.ENEMY_MOVES_TO_FRONT
+        "被消灭" in text || "被消灭时" in text -> CounterTrigger.ENEMY_UNIT_DESTROYED
+        else -> CounterTrigger.NONE
+    }
     fun orderCount(): Int = orders.size
     fun counterCount(): Int = counters.size
     fun hasEffect(card: Card): Boolean = orders.containsKey(card.id)

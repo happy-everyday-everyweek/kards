@@ -106,6 +106,13 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
 
     fun opponentOf(side: Side): PlayerState = player(side.opponent)
 
+    /** 按触发时机结算一方场上所有单位的卡面效果。使用快照，允许效果消灭单位。 */
+    private fun triggerUnits(side: Side, trigger: EffectTrigger, eventUnit: UnitInstance? = null) {
+        player(side).allUnits().toList().forEach { unit ->
+            CardEffectRuntime.execute(this, side, unit.card, unit, explicit = eventUnit, trigger = trigger)
+        }
+    }
+
     // —————————————————————————— 开局与回合 ——————————————————————————
 
     /**
@@ -137,6 +144,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         p.kredits = p.slots.coerceAtMost(KREDIT_CAP)
 
         p.allUnits().forEach { it.resetForTurn() }
+        triggerUnits(side, EffectTrigger.TURN_START)
         p.allUnits().forEach { if (it.card.has(Keyword.AMBUSH)) it.ambushAvailable = true }
         p.allUnits().filter { it.mobilized && it.card.has(Keyword.MOBILIZE) }.forEach {
             it.attackBonus += 1
@@ -189,7 +197,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
 
     // —————————————————————————— 部署与移动 ——————————————————————————
 
-    fun deployUnit(side: Side, card: Card, targetLine: Line = Line.SUPPORT): ActionResult {
+    fun deployUnit(side: Side, card: Card, targetLine: Line = Line.SUPPORT, costOverride: Int? = null): ActionResult {
         if (finished) return ActionResult.Rejected("对局已结束")
         if (side != active) return ActionResult.Rejected("不是 ${side.cn} 的回合")
         if (card.type != CardType.UNIT) {
@@ -197,8 +205,9 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         }
 
         val p = player(side)
-        if (!p.canPay(card.cost)) {
-            return ActionResult.Rejected("指挥点不足，需要 ${card.cost}", RuleId.KREDIT_SPENT_ON_ALL_ACTIONS)
+        val cost = costOverride ?: card.cost
+        if (!p.canPay(cost)) {
+            return ActionResult.Rejected("指挥点不足，需要 $cost", RuleId.KREDIT_SPENT_ON_ALL_ACTIONS)
         }
         if (targetLine == Line.SUPPORT && !p.supportHasRoom()) {
             return ActionResult.Rejected("支援阵线已满（含总部共 5 位）", RuleId.FRONT_LINE_CAP_5)
@@ -210,7 +219,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
             }
         }
 
-        p.pay(card.cost)
+        p.pay(cost)
         val unit = UnitInstance(card, side).also {
             it.line = targetLine
             it.onEnterBoard(turnNumber)
@@ -218,7 +227,13 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         p.unitsOn(targetLine) += unit
         if (targetLine == Line.FRONT) frontOwner = side
 
-        if (card.has(Keyword.DEPLOY)) CardEffectRuntime.execute(this, side, card, unit)
+        CardEffectRuntime.execute(this, side, card, unit, trigger = EffectTrigger.DEPLOY)
+        triggerCounter(side.opponent, CounterTrigger.ENEMY_DEPLOYS_UNIT, unit)
+        triggerUnits(side.opponent, EffectTrigger.ENEMY_DEPLOY, unit)
+        if (targetLine == Line.FRONT) {
+            triggerCounter(side.opponent, CounterTrigger.ENEMY_MOVES_TO_FRONT, unit)
+            triggerUnits(side.opponent, EffectTrigger.MOVE_TO_FRONT, unit)
+        }
 
         if (card.has(Keyword.ALPINE)) {
             val others = p.allUnits().count { it !== unit && it.card.has(Keyword.ALPINE) }
@@ -411,9 +426,15 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
                     "${attacker.card.name} 攻击 ${t.card.name}：" +
                         "攻方 ${attacker.defense}，守方 ${t.defense}"
                 )
+                CardEffectRuntime.execute(this, t.owner, t.card, t, trigger = EffectTrigger.ATTACKED)
                 removeDead()
             }
         }
+
+        CardEffectRuntime.execute(this, side, attacker.card, attacker, trigger = EffectTrigger.ATTACK)
+        triggerCounter(side.opponent, CounterTrigger.ENEMY_ATTACKS,
+            (target as? Target.EnemyUnit)?.unit)
+        if (target is Target.EnemyHq) triggerCounter(side.opponent, CounterTrigger.ENEMY_DAMAGES_HQ)
 
         checkWin()
         return ActionResult.Ok
@@ -437,12 +458,14 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
     private fun applyCombatDamage(u: UnitInstance, raw: Int) {
         u.takeDamage(raw, ignoresArmor = false)
         if (u.card.has(Keyword.MOBILIZE)) u.mobilized = false
+        CardEffectRuntime.execute(this, u.owner, u.card, u, trigger = EffectTrigger.DAMAGED)
     }
 
     /** 指令/效果伤害：无视重甲。 */
     fun effectDamage(u: UnitInstance, raw: Int) {
         u.takeDamage(raw, ignoresArmor = true)
         if (u.card.has(Keyword.MOBILIZE)) u.mobilized = false
+        CardEffectRuntime.execute(this, u.owner, u.card, u, trigger = EffectTrigger.DAMAGED)
         removeDead()
     }
 
@@ -456,10 +479,12 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
             s.allUnits().filter { !it.isAlive }.forEach { dead ->
                 s.unitsOn(dead.line).remove(dead)
                 s.discardPile += dead.card
-                if (dead.card.has(Keyword.DESTRUCTION)) {
+                val hasDeathEffect = CardEffectParser.parse(dead.card).any { it.trigger == EffectTrigger.DESTRUCTION }
+                if (hasDeathEffect) {
                     emit("${dead.card.name} 触发亡计")
-                    CardEffectRuntime.execute(this, s.side, dead.card, dead)
+                    CardEffectRuntime.execute(this, s.side, dead.card, dead, trigger = EffectTrigger.DESTRUCTION)
                 }
+                triggerCounter(s.side.opponent, CounterTrigger.ENEMY_UNIT_DESTROYED, dead)
                 if (dead.line == Line.FRONT && s.front.isEmpty() && frontOwner == s.side) {
                     frontOwner = null
                 }
@@ -597,22 +622,25 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
      * 打出一张指令：支付费用、一次性结算、然后移出游戏。
      * 来源：《卡牌》指令一次性触发后移除。
      */
-    fun playOrder(side: Side, card: Card, target: UnitInstance? = null): ActionResult {
+    fun playOrder(side: Side, card: Card, target: UnitInstance? = null, costOverride: Int? = null): ActionResult {
         if (finished) return ActionResult.Rejected("对局已结束")
         if (side != active) return ActionResult.Rejected("不是 ${side.cn} 的回合")
         if (card.type != CardType.ORDER) {
             return ActionResult.Rejected("${card.name} 不是指令", RuleId.ORDER_ONE_SHOT)
         }
         val p = player(side)
-        if (!p.canPay(card.cost)) {
-            return ActionResult.Rejected("指挥点不足，需要 ${card.cost}", RuleId.KREDIT_SPENT_ON_ALL_ACTIONS)
+        val cost = costOverride ?: card.cost
+        if (!p.canPay(cost)) {
+            return ActionResult.Rejected("指挥点不足，需要 $cost", RuleId.KREDIT_SPENT_ON_ALL_ACTIONS)
         }
 
-        p.pay(card.cost)
-        applyEffect(side, EffectTable.effectOf(card), target)
+        p.pay(cost)
+        CardEffectRuntime.execute(this, side, card, explicit = target)
         // 一次性：结算后进入弃牌堆，不再留在手牌。
         p.discardPile += card
         emit("${side.cn} 使用指令 ${card.name}")
+        triggerUnits(side, EffectTrigger.FRIENDLY_ORDER)
+        triggerUnits(side.opponent, EffectTrigger.ENEMY_ORDER)
         triggerCounter(side.opponent, CounterTrigger.ENEMY_PLAYS_ORDER)
         checkWin()
         return ActionResult.Ok
@@ -714,13 +742,14 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
      * 在指定时机检查并触发反制。触发后移除。
      * 来源：《卡牌》反制在敌方回合满足条件触发、触发后被移除。
      */
-    fun triggerCounter(owner: Side, trigger: CounterTrigger): List<Card> {
+    fun triggerCounter(owner: Side, trigger: CounterTrigger, eventUnit: UnitInstance? = null): List<Card> {
         val p = player(owner)
         val fired = p.activeCounters.filter { EffectTable.triggerOf(it) == trigger }
         fired.forEach { c ->
             p.activeCounters.remove(c)
             p.discardPile += c
             emit("${owner.cn} 的反制触发（${trigger.cn}）")
+            CardEffectRuntime.execute(this, owner, c, explicit = eventUnit)
         }
         return fired
     }

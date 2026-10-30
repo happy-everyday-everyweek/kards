@@ -2,17 +2,28 @@ package com.kards.core
 
 /** 通用卡面操作执行器。目标未由 UI 指定时使用确定性的合法目标，Bot 与玩家遵循同一结算。 */
 object CardEffectRuntime {
-    fun execute(engine: Engine, side: Side, source: Card, self: UnitInstance? = null, explicit: UnitInstance? = null) {
-        CardEffectParser.parse(source).forEach { effect -> apply(engine, side, effect, self, explicit) }
+    fun execute(engine: Engine, side: Side, source: Card, self: UnitInstance? = null, explicit: UnitInstance? = null, trigger: EffectTrigger? = null) {
+        CardEffectParser.parse(source)
+            .filter { trigger == null || it.trigger == trigger }
+            .forEach { effect -> apply(engine, side, effect, self, explicit) }
         engine.checkWin()
     }
 
-    private fun units(engine: Engine, target: EffectTarget, side: Side, self: UnitInstance?, explicit: UnitInstance?): List<UnitInstance> = when (target) {
-        EffectTarget.SELF -> listOfNotNull(self)
-        EffectTarget.ENEMY_UNITS -> engine.opponentOf(side).allUnits().toList()
-        EffectTarget.FRIENDLY_UNITS -> engine.player(side).allUnits().toList()
-        EffectTarget.ALL_UNITS -> engine.p1.allUnits() + engine.p2.allUnits()
-        else -> listOfNotNull(explicit ?: engine.opponentOf(side).allUnits().firstOrNull() ?: self)
+    private fun units(engine: Engine, target: EffectTarget, side: Side, self: UnitInstance?, explicit: UnitInstance?): List<UnitInstance> {
+        val me = engine.player(side).allUnits()
+        val foe = engine.opponentOf(side).allUnits()
+        return when (target) {
+            EffectTarget.SELF -> listOfNotNull(self)
+            EffectTarget.ENEMY_ONE -> listOfNotNull(explicit?.takeIf { it in foe } ?: foe.firstOrNull())
+            EffectTarget.FRIENDLY_ONE -> listOfNotNull(
+                explicit?.takeIf { it in me } ?: self ?: me.firstOrNull()
+            )
+            EffectTarget.TARGET_UNIT -> listOfNotNull(explicit ?: foe.firstOrNull() ?: self)
+            EffectTarget.ENEMY_UNITS -> foe.toList()
+            EffectTarget.FRIENDLY_UNITS -> me.toList()
+            EffectTarget.ALL_UNITS -> me + foe
+            else -> emptyList()
+        }
     }
 
     private fun apply(engine: Engine, side: Side, effect: ParsedEffect, self: UnitInstance?, explicit: UnitInstance?) {
@@ -38,9 +49,23 @@ object CardEffectRuntime {
             EffectOp.RETREAT -> targets.forEach { engine.retreat(it) }
             EffectOp.TAKE_CONTROL -> targets.forEach { engine.takeControl(it, side) }
             EffectOp.DISCARD -> repeat(effect.amount) { me.hand.removeFirstOrNull()?.let { me.discardPile += it.card } }
+            EffectOp.ENEMY_DISCARD -> repeat(effect.amount) { foe.hand.removeFirstOrNull()?.let { foe.discardPile += it.card } }
+            EffectOp.INTEL -> engine.intel(side, effect.amount)
+            EffectOp.DEVELOP -> engine.develop(side, CardPool.all)
+            EffectOp.ADD_COPY -> self?.let {
+                if (me.handHasRoom()) me.hand += HandCard(
+                    it.card.copy(cost = if ("花费为 0" in effect.source || "花费为0" in effect.source) 0 else it.card.cost)
+                )
+            }
+            EffectOp.ADD_CARD -> {
+                val card = CardPool.all.firstOrNull { it.name == effect.detail }
+                if (card != null && me.handHasRoom()) {
+                    me.hand += HandCard(card, costModifier = if ("花费为 0" in effect.source || "花费为0" in effect.source) -card.cost else 0)
+                }
+            }
             EffectOp.SHUFFLE_DECK -> { val shuffled = me.drawPile.shuffled(); me.drawPile.clear(); me.drawPile += shuffled }
             EffectOp.SET_ATTACK_TO_DEFENSE -> targets.forEach { it.attackBonus = it.defense - it.card.attack }
-            EffectOp.HEAL_HQ -> me.hq.damage = (me.hq.damage - effect.amount).coerceAtLeast(0)
+            EffectOp.HEAL_HQ -> engine.healHq(side, effect.amount)
             EffectOp.REDUCE_COST, EffectOp.INCREASE_COST -> {
                 val delta = if (effect.op == EffectOp.REDUCE_COST) -effect.amount else effect.amount
                 me.hand.firstOrNull()?.let { it.costModifier += delta }

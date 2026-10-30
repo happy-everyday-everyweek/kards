@@ -142,6 +142,9 @@ class UnitInstance(val card: Card, val owner: Side) {
     var damage: Int = 0
     var attackBonus: Int = 0
     var maxDefenseBonus: Int = 0
+    /** 卡面持续条件产生的静态加成，每次重算时清零，不会跨回合叠加。 */
+    var passiveAttackBonus: Int = 0
+    var passiveDefenseBonus: Int = 0
     var line: Line = Line.SUPPORT
     var suppressed: Boolean = false
     /** 压制的解除回合号。 */
@@ -169,9 +172,9 @@ class UnitInstance(val card: Card, val owner: Side) {
     /** 也算作坦克时，坦克专属规则同样适用。 */
     val tankLike: Boolean get() = unitType == UnitType.TANK || card.countsAsTank
 
-    val attack: Int get() = if (suppressed) card.attack else card.attack + attackBonus
+    val attack: Int get() = if (suppressed) card.attack else card.attack + attackBonus + passiveAttackBonus
 
-    val maxDefense: Int get() = if (suppressed) card.defense else card.defense + maxDefenseBonus
+    val maxDefense: Int get() = if (suppressed) card.defense else card.defense + maxDefenseBonus + passiveDefenseBonus
 
     val defense: Int get() = maxDefense - damage
 
@@ -217,6 +220,8 @@ class UnitInstance(val card: Card, val owner: Side) {
         keywords.clear()
         attackBonus = 0
         maxDefenseBonus = 0
+        passiveAttackBonus = 0
+        passiveDefenseBonus = 0
         damage = 0
         smokeActive = false
         ambushAvailable = false
