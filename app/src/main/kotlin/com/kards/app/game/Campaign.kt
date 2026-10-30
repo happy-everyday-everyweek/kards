@@ -3,7 +3,7 @@ package com.kards.app.game
 import android.content.Context
 import com.kards.core.Nation
 
-/** 五场离线 PVE 战役。AI 强度只改变决策，不修改卡牌属性或规则。 */
+/** 五场离线 PVE 战役。名称、阵营、年份以官方战区页面为准，特殊任务尚待 Wiki 核实。 */
 data class Campaign(
     val id: String,
     val title: String,

@@ -79,7 +79,7 @@ fun CampaignScreen(progress: CampaignProgress, onSelect: (Campaign) -> Unit, onB
                         Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AssistChip(onClick = { onSelect(campaign) },
-                                label = { Text("难度 ${"★".repeat(campaign.difficulty)}") })
+                                label = { Text("历史战役 · 特殊任务待核实") })
                             Spacer(Modifier.weight(1f))
                             Text(if (progress.isCompleted(campaign.id)) "已通关" else "开始战役",
                                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)

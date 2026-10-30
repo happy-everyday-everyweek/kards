@@ -119,7 +119,11 @@ data class Card(
     /** 流亡卡牌的流亡所属国家。 */
     val exileNation: Nation? = null,
     /** 卡池归属，来自 Wiki 卡表「卡池」列；未标注时为 null。 */
-    val pool: PoolSystem.Pool? = null
+    val pool: PoolSystem.Pool? = null,
+    /** 数据源提供的完整卡面原文；效果实现必须据此核对。 */
+    val effectText: String = "",
+    /** 衍生的老兵版本 id，只使用数据源中存在的卡。 */
+    val veteranCardId: String? = null
 ) {
     init {
         if (type == CardType.UNIT) {
