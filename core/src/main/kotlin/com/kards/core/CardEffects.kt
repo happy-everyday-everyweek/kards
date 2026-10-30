@@ -19,7 +19,7 @@ enum class EffectTarget {
 enum class EffectTrigger {
     DEPLOY, DESTRUCTION, ATTACK, ATTACKED, DAMAGED, TURN_START,
     FRIENDLY_ORDER, ENEMY_ORDER, ENEMY_DEPLOY, ENEMY_HQ_DAMAGE,
-    MOVE_TO_FRONT, PASSIVE
+    MOVE_TO_FRONT, PASSIVE, COUNTDOWN
 }
 
 data class ParsedEffect(
@@ -71,6 +71,7 @@ object CardEffectParser {
 
     private fun triggerOf(text: String): EffectTrigger = when {
         "亡计" in text -> EffectTrigger.DESTRUCTION
+        "倒计时" in text -> EffectTrigger.COUNTDOWN
         "部署：" in text || "部署:" in text -> EffectTrigger.DEPLOY
         "友方回合开始时" in text || "下个回合开始时" in text -> EffectTrigger.TURN_START
         "友方使用指令时" in text || "友方使用海军牌时" in text -> EffectTrigger.FRIENDLY_ORDER

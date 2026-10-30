@@ -41,8 +41,14 @@ object CardEffectRuntime {
             EffectOp.GAIN_KREDITS -> me.gainKredits(effect.amount)
             EffectOp.GAIN_SLOTS -> me.gainSlots(effect.amount)
             EffectOp.LOSE_SLOTS -> me.slots = (me.slots - effect.amount).coerceAtLeast(0)
-            EffectOp.BUFF_ATTACK -> targets.forEach { it.attackBonus += effect.amount }
-            EffectOp.BUFF_DEFENSE -> targets.forEach { it.maxDefenseBonus += effect.amount }
+            EffectOp.BUFF_ATTACK -> targets.forEach {
+                if (effect.trigger == EffectTrigger.PASSIVE) it.passiveAttackBonus += effect.amount
+                else it.attackBonus += effect.amount
+            }
+            EffectOp.BUFF_DEFENSE -> targets.forEach {
+                if (effect.trigger == EffectTrigger.PASSIVE) it.passiveDefenseBonus += effect.amount
+                else it.maxDefenseBonus += effect.amount
+            }
             EffectOp.PIN -> targets.forEach { engine.pin(it) }
             EffectOp.SUPPRESS -> targets.forEach { engine.suppress(it) }
             EffectOp.REPAIR -> targets.forEach { engine.repair(it) }

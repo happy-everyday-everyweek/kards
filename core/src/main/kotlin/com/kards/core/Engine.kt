@@ -113,6 +113,27 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         }
     }
 
+    /** 重算持续效果。先清零静态加成，再按当前场面重新结算，避免叠加。 */
+    private fun refreshPassives(side: Side) {
+        val units = player(side).allUnits().toList()
+        units.forEach {
+            it.passiveAttackBonus = 0
+            it.passiveDefenseBonus = 0
+        }
+        triggerUnits(side, EffectTrigger.PASSIVE)
+    }
+
+    /** 倒计时在拥有者回合开始时递减，归零时执行卡面倒计时效果。 */
+    private fun resolveCountdowns(side: Side) {
+        player(side).allUnits().toList().forEach { unit ->
+            if (unit.countdownLeft <= 0) return@forEach
+            unit.countdownLeft -= 1
+            if (unit.countdownLeft == 0) {
+                CardEffectRuntime.execute(this, side, unit.card, unit, trigger = EffectTrigger.COUNTDOWN)
+            }
+        }
+    }
+
     // —————————————————————————— 开局与回合 ——————————————————————————
 
     /**
@@ -144,6 +165,8 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         p.kredits = p.slots.coerceAtMost(KREDIT_CAP)
 
         p.allUnits().forEach { it.resetForTurn() }
+        refreshPassives(side)
+        resolveCountdowns(side)
         triggerUnits(side, EffectTrigger.TURN_START)
         p.allUnits().forEach { if (it.card.has(Keyword.AMBUSH)) it.ambushAvailable = true }
         p.allUnits().filter { it.mobilized && it.card.has(Keyword.MOBILIZE) }.forEach {
@@ -243,7 +266,8 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
 
         if (card.has(Keyword.COUNTDOWN) && card.countdown > 0) unit.countdownLeft = card.countdown
 
-        emit("${side.cn} 部署 ${card.name}（${card.cost}K）至${targetLine.cn}")
+        refreshPassives(side)
+        emit("${side.cn} 部署 ${card.name}（${cost}K）至${targetLine.cn}")
         return ActionResult.Ok
     }
 
@@ -329,6 +353,9 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         when (target) {
             is Target.EnemyUnit -> {
                 val t = target.unit
+                if (t.has(Keyword.COVERT) && !t.covertRevealed) {
+                    return ActionResult.Rejected("隐蔽单位未被揭示，不能指定为目标")
+                }
                 if (t.smokeActive && t.has(Keyword.SMOKE)) {
                     return ActionResult.Rejected("烟幕单位无法被单位攻击", RuleId.KW_SMOKE)
                 }
@@ -427,6 +454,9 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
                         "攻方 ${attacker.defense}，守方 ${t.defense}"
                 )
                 CardEffectRuntime.execute(this, t.owner, t.card, t, trigger = EffectTrigger.ATTACKED)
+                if (!t.isAlive && attacker.has(Keyword.SALVAGE)) {
+                    salvage(side, t, attacker.card.nation)
+                }
                 removeDead()
             }
         }
@@ -463,6 +493,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
 
     /** 指令/效果伤害：无视重甲。 */
     fun effectDamage(u: UnitInstance, raw: Int) {
+        if (u.has(Keyword.IMMUNE)) return
         u.takeDamage(raw, ignoresArmor = true)
         if (u.card.has(Keyword.MOBILIZE)) u.mobilized = false
         CardEffectRuntime.execute(this, u.owner, u.card, u, trigger = EffectTrigger.DAMAGED)
