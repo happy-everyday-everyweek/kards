@@ -40,7 +40,7 @@ object DeckValidator {
         deck.cards.filter { it.nation != deck.mainNation && it.rarity == Rarity.ELITE }
             .forEach { out += DeckViolation(RuleId.DECK_ALLY_NO_ELITE, "盟国不能携带精英卡：${it.name}") }
 
-        deck.cards.groupBy { it.id }.forEach { (_, group) ->
+        deck.cards.groupBy { it.name }.forEach { (_, group) ->
             val card = group.first()
             if (group.size > card.rarity.maxCopies) {
                 // 同名上限按稀有度：普通 4 / 限定 3 / 特殊 2 / 精英 1。

@@ -7,7 +7,9 @@ sealed interface ActionResult {
 }
 
 /** 手牌。concealed 表示对对手隐藏（反制激活前、隐蔽单位）。 */
-data class HandCard(val card: Card, val concealed: Boolean = false)
+data class HandCard(val card: Card, val concealed: Boolean = false, var costModifier: Int = 0) {
+    val cost: Int get() = (card.cost + costModifier).coerceAtLeast(0)
+}
 
 /** 单方玩家状态。 */
 class PlayerState(val side: Side, val deck: Deck) {
@@ -215,6 +217,8 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         }
         p.unitsOn(targetLine) += unit
         if (targetLine == Line.FRONT) frontOwner = side
+
+        if (card.has(Keyword.DEPLOY)) CardEffectRuntime.execute(this, side, card, unit)
 
         if (card.has(Keyword.ALPINE)) {
             val others = p.allUnits().count { it !== unit && it.card.has(Keyword.ALPINE) }
@@ -442,12 +446,20 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         removeDead()
     }
 
+    fun destroy(unit: UnitInstance) {
+        unit.damage = unit.maxDefense
+        removeDead()
+    }
+
     private fun removeDead() {
         for (s in listOf(p1, p2)) {
             s.allUnits().filter { !it.isAlive }.forEach { dead ->
                 s.unitsOn(dead.line).remove(dead)
                 s.discardPile += dead.card
-                if (dead.card.has(Keyword.DESTRUCTION)) emit("${dead.card.name} 触发亡计")
+                if (dead.card.has(Keyword.DESTRUCTION)) {
+                    emit("${dead.card.name} 触发亡计")
+                    CardEffectRuntime.execute(this, s.side, dead.card, dead)
+                }
                 if (dead.line == Line.FRONT && s.front.isEmpty() && frontOwner == s.side) {
                     frontOwner = null
                 }

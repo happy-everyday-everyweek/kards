@@ -1,7 +1,10 @@
 package com.kards.app.game
 
 import android.content.Context
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.kards.core.Card
 import com.kards.core.CardPool
 import com.kards.core.CardType
@@ -16,8 +19,8 @@ class DeckEditorState(context: Context, initialNation: Nation = Nation.GERMANY) 
     val cards = mutableStateListOf<Card>()
 
     init {
-        val ids = prefs.getStringSet("ids", emptySet()).orEmpty()
-        CardPool.all.filter { it.id in ids && it.type != CardType.HQ }.forEach { cards += it }
+        val ids = prefs.getString("ids", "").orEmpty().split(',').filter { it.isNotBlank() }
+        ids.forEach { id -> CardPool.all.firstOrNull { it.id == id && it.type != CardType.HQ }?.let { cards += it } }
         if (cards.isNotEmpty()) nation = cards.first().nation
     }
 
@@ -50,8 +53,10 @@ class DeckEditorState(context: Context, initialNation: Nation = Nation.GERMANY) 
     }
 
     fun save() {
-        prefs.edit().putStringSet("ids", cards.mapTo(mutableSetOf()) { it.id }).apply()
+        prefs.edit().putString("ids", cards.joinToString(",") { it.id }).apply()
     }
 
-    fun toDeck(): Deck? = if (isReady) Deck(nation, CardPool.hqFor(nation), cards.toList()) else null
+    fun toDeck(): Deck? = if (isReady) Deck(nation, CardPool.hqFor(nation), cards.toList()).also {
+        check(com.kards.core.DeckValidator.isValid(it)) { "卡组不符合构筑规则" }
+    } else null
 }

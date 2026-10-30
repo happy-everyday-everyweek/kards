@@ -30,7 +30,7 @@ class GameController(
     private val customDeck: Deck? = null,
     private val onVictory: () -> Unit = {}
 ) {
-    private val playerNation = customDeck?.nation ?: campaign?.nation ?: Nation.GERMANY
+    private val playerNation = customDeck?.mainNation ?: campaign?.nation ?: Nation.GERMANY
 
     /** 玩家选中的手牌（用于部署/使用）。 */
     var selectedHandIndex by mutableStateOf(-1)
@@ -63,7 +63,7 @@ class GameController(
     }
 
     fun newGame() {
-        val p1Deck = customDeck ?: buildDeck(playerNation)
+        val p1Deck = customDeck?.let { Deck(it.mainNation, it.hq, it.cards.shuffled()) } ?: buildDeck(playerNation)
         val botNation = botNationFor(playerNation)
         val p2Deck = buildDeck(botNation)
 
@@ -213,21 +213,7 @@ class GameController(
         if (hi >= 0) p.hand.removeAt(hi)
         p.discardPile += card
         val foe = engine.player(side.opponent)
-        when (EffectTable.effectOf(card)) {
-            OrderEffect.DAMAGE_ONE -> foe.allUnits().firstOrNull()?.let { engine.effectDamage(it, 2) }
-            OrderEffect.DAMAGE_ALL -> foe.allUnits().forEach { engine.effectDamage(it, 2) }
-            OrderEffect.DRAW -> engine.draw(side, 2)
-            OrderEffect.GAIN_KREDIT -> p.gainKredits(3)
-            OrderEffect.GAIN_SLOT -> p.gainSlots(1)
-            OrderEffect.LOSE_SLOT_ENEMY -> foe.slots = (foe.slots - 1).coerceAtLeast(1)
-            OrderEffect.SUPPRESS_ONE -> foe.allUnits().firstOrNull()?.let { engine.suppress(it) }
-            OrderEffect.PIN_ALL -> foe.allUnits().forEach { engine.pin(it) }
-            OrderEffect.REPAIR_ALL -> p.allUnits().forEach { engine.repair(it) }
-            OrderEffect.BUFF_ALL -> p.allUnits().forEach { it.attackBonus += 1; it.maxDefenseBonus += 1 }
-            OrderEffect.HEAL_HQ -> p.hq.maxDefenseBonus += 3
-            OrderEffect.RETREAT_ONE -> foe.allUnits().firstOrNull()?.let { engine.retreat(it) }
-            else -> Unit // 其余效果在 Demo 里按无附加处理
-        }
+        com.kards.core.CardEffectRuntime.execute(engine, side, card)
         say("使用了 ${card.name}")
     }
 

@@ -34,11 +34,16 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -56,9 +61,9 @@ fun KardsApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val progress = remember { com.kards.app.game.CampaignProgress(context) }
     val editor = remember { com.kards.app.game.DeckEditorState(context) }
-    var screen by remember { androidx.compose.runtime.mutableStateOf("home") }
-    var campaign by remember { androidx.compose.runtime.mutableStateOf<com.kards.app.game.Campaign?>(null) }
-    var progressRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var screen by remember { mutableStateOf("home") }
+    var campaign by remember { mutableStateOf<com.kards.app.game.Campaign?>(null) }
+    var progressRevision by remember { mutableIntStateOf(0) }
     when (screen) {
         "home" -> HomeScreen(progress.completedCount(), editor.isReady,
             { screen = "campaigns" }, { screen = "deck" }, { campaign = null; screen = "battle" })
@@ -66,13 +71,20 @@ fun KardsApp() {
         "deck" -> DeckEditorScreen(editor) { screen = "home" }
         else -> {
             progressRevision
-            BattleScreen(campaign, editor.toDeck(), { if (campaign != null) { progress.complete(campaign!!.id); progressRevision++ } }) {
-                screen = if (campaign != null) "campaigns" else "home"
+            val current = campaign
+            BattleScreen(current, editor.toDeck(), {
+                if (current != null) {
+                    progress.complete(current.id)
+                }
+                progressRevision++
+            }) {
+                screen = if (current != null) "campaigns" else "home"
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BattleScreen(
     campaign: com.kards.app.game.Campaign?,
@@ -97,7 +109,7 @@ private fun BattleScreen(
                 title = {
                     Column {
                         Text("KARDS", fontWeight = FontWeight.SemiBold)
-Text(campaign?.title ?: "快速人机对战 · 离线规则引擎",
+                        Text(campaign?.title ?: "快速人机对战 · 离线规则引擎",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
