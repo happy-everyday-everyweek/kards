@@ -132,7 +132,15 @@ data class Card(
         require(armor <= 3) { "单位最多 3 重甲：$id" }
     }
 
-    fun has(k: Keyword): Boolean = keywords.contains(k)
+    fun has(k: Keyword): Boolean = keywords.contains(k) || when (k) {
+        Keyword.DEPLOY -> "部署" in effectText
+        Keyword.DESTRUCTION -> "亡计" in effectText
+        Keyword.COUNTDOWN -> "倒计时" in effectText
+        Keyword.SACRIFICE -> "弃置自身" in effectText || "牺牲" in effectText
+        Keyword.HEAVY_ARMOR -> Regex("重甲\\s*[0-9一二三]").containsMatchIn(effectText)
+        Keyword.INTEL -> Regex("情报\\s*[0-9一二三]").containsMatchIn(effectText)
+        else -> false
+    }
 }
 
 /**

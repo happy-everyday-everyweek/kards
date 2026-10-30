@@ -88,7 +88,7 @@ object CardPool {
     val INF_89 get() = need(Nation.GERMANY, "第1步兵团")
 
     /** 美国 1 费步兵，用于盟国相关测试。 */
-    val INF_432 get() = need(Nation.USA, "第432步兵团")
+    val INF_432 get() = need(Nation.USA, "第 32 步兵团")
 
     /** 德国 2 费装甲掷弹兵。 */
     val PZ_GREN get() = need(Nation.GERMANY, "第59装甲掷弹兵团")
@@ -109,7 +109,7 @@ object CardPool {
     val U375 get() = need(Nation.GERMANY, "Hs 126")
 
     /** 德国战斗机。 */
-    val FIGHTER_GER get() = need(Nation.GERMANY, "Bf 109 E 埃米尔")
+    val FIGHTER_GER get() = need(Nation.GERMANY, "Bf 109 E")
 
     /** 德国轰炸机。 */
     val BOMBER_GER get() = need(Nation.GERMANY, "Ju 87 B-2 斯图卡")
