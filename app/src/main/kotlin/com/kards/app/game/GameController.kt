@@ -66,13 +66,12 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
             Engine.newState(p1Deck, Side.P1),
             Engine.newState(p2Deck, Side.P2)
         )
-        engine.start(Side.P1)
+        engine.start(Side.P1)   // start 内部已经调用了 beginTurn，这里不能再重复调用
         playerIsFirst = true
         selectedHandIndex = -1
         selectedUnit = null
         resultText = null
         toast = null
-        engine.beginTurn(Side.P1)
         refresh()
     }
 
@@ -84,20 +83,33 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
      * 按费用从低到高铺，保证 Bot 与玩家都有牌可出。
      */
     private fun buildDeck(nation: Nation): Deck {
+        // 只用该国的真实卡。按费用升序，保证低费卡够用。
         val pool = CardPool.ofNation(nation)
-            .filter { it.type != CardType.HQ && it.cost <= 6 }
+            .filter { it.type != CardType.HQ }
             .sortedBy { it.cost }
+        require(pool.isNotEmpty()) { "${nation.cn} 没有可用卡牌" }
+
         val chosen = mutableListOf<Card>()
-        var i = 0
-        while (chosen.size < 39 && pool.isNotEmpty()) {
-            val c = pool[i % pool.size]
-            // 同名上限：用稀有度自带的 maxCopies 限制
-            if (chosen.count { it.id == c.id } < c.rarity.maxCopies) chosen += c
-            i++
-            if (i > 5000) break
+        // 同名上限按「卡名」判定（数据源里同名卡可能有多个条目）
+        fun countOf(name: String) = chosen.count { it.name == name }
+
+        var guard = 0
+        while (chosen.size < 39 && guard++ < 10000) {
+            var added = false
+            for (c in pool) {
+                if (chosen.size >= 39) break
+                if (countOf(c.name) < c.rarity.maxCopies) {
+                    chosen += c
+                    added = true
+                }
+            }
+            if (!added) break
         }
-        while (chosen.size < 39 && pool.isNotEmpty()) {
-            chosen += pool[chosen.size % pool.size]
+        // 极端情况下（可选卡太少）用低费卡补满，保证能开局
+        var i = 0
+        while (chosen.size < 39) {
+            chosen += pool[i % pool.size]
+            i++
         }
         return Deck(nation, CardPool.hqFor(nation), chosen.take(39))
     }
@@ -155,6 +167,12 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
         val r = engine.deployUnit(Side.P1, card, line)
         when (r) {
             is ActionResult.Ok -> {
+                // 引擎只负责战场结算，手牌移除由调用方处理，并从指定位置删掉这一张
+                if (idx < engine.p1.hand.size && engine.p1.hand[idx].card.id == card.id) {
+                    engine.p1.hand.removeAt(idx)
+                } else {
+                    engine.p1.hand.removeAll { it.card.id == card.id }
+                }
                 selectedHandIndex = -1
                 say("已部署 ${card.name}")
             }
@@ -182,7 +200,9 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
             return
         }
         p.pay(card.cost)
-        p.hand.removeAll { it.card.id == card.id }
+        // 只从手牌移除一张同名卡，不能一次删光
+        val hi = p.hand.indexOfFirst { it.card.id == card.id }
+        if (hi >= 0) p.hand.removeAt(hi)
         p.discardPile += card
         val foe = engine.player(side.opponent)
         when (EffectTable.effectOf(card)) {
@@ -282,8 +302,8 @@ class GameController(private val playerNation: Nation = Nation.GERMANY) {
             refresh()
         }
         if (engine.finished) return
+        // endTurn 内部会切换到对方并开始其回合，不需要再额外 beginTurn
         engine.endTurn()
-        engine.beginTurn(Side.P1)
         refresh()
     }
 

@@ -78,7 +78,6 @@ object EffectTable {
         Triple(Nation.UK, "商船队", OrderEffect.DRAW),
         Triple(Nation.UK, "雷达警报", OrderEffect.FORECAST),
         Triple(Nation.UK, "军情五处", OrderEffect.SUPPRESS_ONE),
-        Triple(Nation.UK, "ORP 鹰号", OrderEffect.EXILE),
         Triple(Nation.UK, "整修", OrderEffect.REPAIR_ALL),
         Triple(Nation.USSR, "战时生产", OrderEffect.GAIN_KREDIT),
         Triple(Nation.USSR, "乌拉尔工厂", OrderEffect.DRAW),
@@ -114,17 +113,31 @@ object EffectTable {
         Triple(Nation.FRANCE, "自由法国海军", CounterTrigger.NONE)
     )
 
-    private fun resolve(nation: Nation, name: String): String {
-        val card = CardPool.byName(nation, name)
-            ?: error("效果表登记了不存在的卡：${nation.cn}「$name」")
-        return card.id
+    /**
+     * 查一个「国家 + 卡名」在卡池里的 id。
+     *
+     * 找不到时返回 null 而不是抛异常：数据源随时可能变动，
+     * 效果表缺一条不该让整个 App 起不来。缺哪些卡记在 [missing] 里供测试断言。
+     */
+    private fun resolveOrNull(nation: Nation, name: String): String? =
+        CardPool.byName(nation, name)?.id
+
+    private val orderPairs = orderSpecs.mapNotNull { (n, name, eff) ->
+        resolveOrNull(n, name)?.let { it to eff }
+    }
+    private val counterPairs = counterSpecs.mapNotNull { (n, name, trig) ->
+        resolveOrNull(n, name)?.let { it to trig }
     }
 
-    private val orders: Map<String, OrderEffect> =
-        orderSpecs.associate { (n, name, eff) -> resolve(n, name) to eff }
+    private val orders: Map<String, OrderEffect> = orderPairs.toMap()
+    private val counters: Map<String, CounterTrigger> = counterPairs.toMap()
 
-    private val counters: Map<String, CounterTrigger> =
-        counterSpecs.associate { (n, name, trig) -> resolve(n, name) to trig }
+    /** 效果表里登记了、但卡池里找不到的卡。正常情况下应为空。 */
+    val missing: List<String> =
+        orderSpecs.filter { resolveOrNull(it.first, it.second) == null }
+            .map { "${it.first.cn}「${it.second}」" } +
+            counterSpecs.filter { resolveOrNull(it.first, it.second) == null }
+                .map { "${it.first.cn}「${it.second}」" }
 
     fun effectOf(card: Card): OrderEffect = orders[card.id] ?: OrderEffect.NO_OP
     fun triggerOf(card: Card): CounterTrigger = counters[card.id] ?: CounterTrigger.NONE
