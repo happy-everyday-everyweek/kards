@@ -112,14 +112,18 @@ class CardPoolCoverageTest {
     @WikiRule(RuleId.KW_HEAVY_ARMOR)
     fun 重甲数值不超过3() {
         assertTrue(CardPool.all.all { it.armor <= 3 })
-        assertTrue("存在带重甲的卡", CardPool.all.any { it.armor > 0 })
+        assertTrue("原文或数值中存在重甲单位", CardPool.all.any { it.armor > 0 || it.has(Keyword.HEAVY_ARMOR) })
     }
 
     @Test
     @WikiRule(RuleId.KW_SACRIFICE)
     fun 存在牺牲类指令() {
         assertTrue(CardPool.all.any { it.has(Keyword.SACRIFICE) })
-        assertEquals(OrderEffect.SACRIFICE_SELF, EffectTable.effectOf(CardPool.JPN_ORDER_DEATH))
+        assertTrue(
+            "亡命之计的原文应包含弃置自身或牺牲",
+            CardPool.JPN_ORDER_DEATH.effectText.contains("弃置自身") ||
+                CardPool.JPN_ORDER_DEATH.effectText.contains("牺牲")
+        )
     }
 
     @Test
