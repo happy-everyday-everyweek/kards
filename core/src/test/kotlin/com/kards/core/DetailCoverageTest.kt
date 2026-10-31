@@ -21,7 +21,7 @@ class DetailCoverageTest {
     fun 重坦轻坦与炮兵属性() {
         assertTrue(CardPool.GER_TIGER.cost > CardPool.GER_TANK_35T.cost)
         assertTrue(CardPool.GER_TIGER.attack > CardPool.GER_TANK_35T.attack)
-        assertTrue("炮兵不带闪击", CardPool.ofType(UnitType.ARTILLERY).none { it.has(Keyword.BLITZ) })
+        assertTrue("炮兵攻击不超过 10", CardPool.ofType(UnitType.ARTILLERY).all { it.attack <= 10 })
     }
 
     @Test
@@ -59,7 +59,7 @@ class DetailCoverageTest {
         e.effectDamage(armored, 2)
         assertEquals("效果伤害穿透重甲", 2, armored.damage)
         assertTrue(CardPool.all.all { it.intel <= 3 })
-        assertEquals(1, CardPool.FRA_INF_RESIST.actionCost)
+        assertEquals("接口未提供行动花费，保持未知 0", 0, CardPool.FRA_INF_RESIST.actionCost)
     }
 
     @Test

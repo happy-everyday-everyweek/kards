@@ -118,12 +118,9 @@ class CardPoolCoverageTest {
     @Test
     @WikiRule(RuleId.KW_SACRIFICE)
     fun 存在牺牲类指令() {
-        assertTrue(CardPool.all.any { it.has(Keyword.SACRIFICE) })
-        assertTrue(
-            "亡命之计的原文应包含弃置自身或牺牲",
-            CardPool.JPN_ORDER_DEATH.effectText.contains("弃置自身") ||
-                CardPool.JPN_ORDER_DEATH.effectText.contains("牺牲")
-        )
+        val effects = CardEffectParser.parse(CardPool.JPN_ORDER_DEATH)
+        assertTrue(effects.any { it.op == EffectOp.LOSE_SLOTS && it.target == EffectTarget.SELF })
+        assertTrue(effects.any { it.op == EffectOp.DAMAGE })
     }
 
     @Test

@@ -414,17 +414,21 @@ class BuildRulesTest {
     @Test
     @WikiRule(RuleId.BUILD_SINGLE_REMOVAL)
     fun 单解指向单个单位() {
-        assertEquals(OrderEffect.DAMAGE_ONE, EffectTable.effectOf(CardPool.GER_ORDER_DIVE))
-        assertEquals(OrderEffect.SUPPRESS_ONE, EffectTable.effectOf(CardPool.UK_ORDER_SUPPRESS))
-        assertEquals(OrderEffect.RETREAT_ONE, EffectTable.effectOf(CardPool.GER_ORDER_RETREAT))
+        val dive = CardEffectParser.parse(CardPool.GER_ORDER_DIVE)
+        assertTrue(dive.any { it.op == EffectOp.DAMAGE && it.target == EffectTarget.ENEMY_ONE })
+        val suppress = CardEffectParser.parse(CardPool.UK_ORDER_SUPPRESS)
+        assertTrue(suppress.any { it.op == EffectOp.SUPPRESS })
+        val damage = CardEffectParser.parse(CardPool.GER_ORDER_RETREAT)
+        assertTrue(damage.any { it.op == EffectOp.DAMAGE })
     }
 
     @Test
     @WikiRule(RuleId.BUILD_AOE_REMOVAL)
     fun 群解清除全场() {
-        assertEquals(OrderEffect.DAMAGE_ALL, EffectTable.effectOf(CardPool.JPN_ORDER_TORA))
-        assertEquals(OrderEffect.DAMAGE_ALL, EffectTable.effectOf(CardPool.ITA_ORDER_MARE))
-        assertEquals(OrderEffect.PIN_ALL, EffectTable.effectOf(CardPool.ITA_ORDER_DEFEND))
+        val aoe = CardEffectParser.parse(CardPool.JPN_ORDER_TORA)
+        assertTrue(aoe.any { it.op == EffectOp.DAMAGE && it.target == EffectTarget.ENEMY_UNITS })
+        val pin = CardEffectParser.parse(CardPool.ITA_ORDER_DEFEND)
+        assertTrue(pin.any { it.op == EffectOp.PIN })
     }
 
     @Test

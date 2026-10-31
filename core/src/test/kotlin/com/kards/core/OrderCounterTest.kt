@@ -170,8 +170,7 @@ class OrderExecutionTest {
     @Test
     @WikiRule(RuleId.BUILD_FAST_NO_AOE, RuleId.KW_SACRIFICE)
     fun 亡命之计是快攻可用的群解() {
-        assertTrue(EffectTable.hasEffect(CardPool.JPN_ORDER_DEATH))
-        assertEquals(OrderEffect.SACRIFICE_SELF, EffectTable.effectOf(CardPool.JPN_ORDER_DEATH))
+        assertTrue(CardEffectParser.parse(CardPool.JPN_ORDER_DEATH).any { it.op == EffectOp.DAMAGE })
         assertTrue(BuildRules.aggroAllowsAoe("亡命之计"))
     }
 }

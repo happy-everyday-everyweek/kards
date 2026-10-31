@@ -168,6 +168,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
 
         p.allUnits().forEach { it.resetForTurn() }
         refreshPassives(side)
+        applyConditionalKeywords(p.allUnits())
         resolveCountdowns(side)
         triggerUnits(side, EffectTrigger.TURN_START)
         p.allUnits().forEach { if (it.card.has(Keyword.AMBUSH)) it.ambushAvailable = true }
@@ -175,6 +176,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
             it.attackBonus += 1
             it.maxDefenseBonus += 1
         }
+        applyConditionalKeywords(p.allUnits())
         val expiredPins = p.allUnits().filter { it.pinnedUntilTurn >= 0 && turnNumber > it.pinnedUntilTurn }
         expiredPins.forEach { it.pinnedUntilTurn = -1 }
 
@@ -269,6 +271,7 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         if (card.has(Keyword.COUNTDOWN) && card.countdown > 0) unit.countdownLeft = card.countdown
 
         refreshPassives(side)
+        applyConditionalKeywords(p.allUnits())
         emit("${side.cn} 部署 ${card.name}（${cost}K）至${targetLine.cn}")
         return ActionResult.Ok
     }
@@ -505,6 +508,23 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
     fun destroy(unit: UnitInstance) {
         unit.damage = unit.maxDefense
         removeDead()
+    }
+
+    private fun applyConditionalKeywords(units: List<UnitInstance>) {
+        units.filter { !it.suppressed }.forEach { unit ->
+            val text = unit.card.effectText
+            if ("在支援阵线时" in text && unit.line == Line.SUPPORT) {
+                if ("伏击" in text) unit.keywords += Keyword.AMBUSH
+                if ("守护" in text) unit.keywords += Keyword.GUARD
+            }
+            if ("受到伤害时" in text && unit.damage > 0 && "冲击" in text) {
+                unit.keywords += Keyword.SHOCK
+                unit.shockAvailable = true
+            }
+            Regex("攻击力不小于\\s*([0-9]+)").find(text)?.let {
+                if (unit.attack >= it.groupValues[1].toInt() && "闪击" in text) unit.keywords += Keyword.BLITZ
+            }
+        }
     }
 
     /** 将单位移出战场并返回拥有者手牌，手牌满时按移除处理。 */
