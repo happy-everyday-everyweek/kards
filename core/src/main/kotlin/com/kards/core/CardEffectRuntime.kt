@@ -31,7 +31,12 @@ object CardEffectRuntime {
         val foe = engine.opponentOf(side)
         val targets = units(engine, effect.target, side, self, explicit)
         when (effect.op) {
-            EffectOp.DAMAGE -> targets.forEach { engine.effectDamage(it, effect.amount) }
+            EffectOp.DAMAGE -> {
+                if (effect.target == EffectTarget.ENEMY_UNITS) {
+                    foe.allUnits().toList().forEach { engine.effectDamage(it, effect.amount) }
+                    foe.hq.takeDamage(effect.amount)
+                } else targets.forEach { engine.effectDamage(it, effect.amount) }
+            }
             EffectOp.DAMAGE_HQ -> {
                 val hq = if (effect.target == EffectTarget.FRIENDLY_HQ) me.hq else foe.hq
                 hq.takeDamage(effect.amount)

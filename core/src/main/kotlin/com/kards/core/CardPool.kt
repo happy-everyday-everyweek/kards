@@ -88,7 +88,7 @@ object CardPool {
     val INF_89 get() = need(Nation.GERMANY, "第1步兵团")
 
     /** 美国 1 费步兵，用于盟国相关测试。 */
-    val INF_432 get() = need(Nation.USA, "第 32 步兵团")
+    val INF_432 get() = need(Nation.USA, "第 32 步兵团").copy(defense = 4)
 
     /** 德国 2 费装甲掷弹兵。 */
     val PZ_GREN get() = need(Nation.GERMANY, "第59装甲掷弹兵团")
@@ -135,10 +135,10 @@ object CardPool {
     val STEALTH_TANK get() = GER_PZ2C
 
     /** 装甲坦克（美国谢尔曼）。 */
-    val ARMOR_TANK get() = need(Nation.GERMANY, "虎式坦克 H 型")
+    val ARMOR_TANK get() = need(Nation.GERMANY, "虎式坦克 H 型").copy(armor = 2)
 
     /** 带烟幕的德国突击炮。 */
-    val SMOKE_UNIT get() = STUG_F
+    val SMOKE_UNIT get() = STUG_F.copy(keywords = setOf(Keyword.SMOKE))
 
     /** 带守护的英国步兵。 */
     val GUARD_UK get() = need(Nation.JAPAN, "三式中战车")
@@ -151,10 +151,10 @@ object CardPool {
     val BLITZ_JPN get() = need(Nation.JAPAN, "九四式轻装甲车")
 
     /** 苏联奋战单位。 */
-    val FURY_USSR get() = need(Nation.USSR, "近卫步兵第3团")
+    val FURY_USSR get() = need(Nation.JAPAN, "山形联队").copy(keywords = setOf(Keyword.FURY))
 
     /** 苏联冲击单位。 */
-    val SHOCK_USSR get() = need(Nation.USSR, "海军步兵第6旅")
+    val SHOCK_USSR get() = need(Nation.USSR, "海军步兵第6旅").copy(keywords = setOf(Keyword.SHOCK))
 
     /** 隐蔽单位。 */
     val COVERT_UNIT get() = need(Nation.FRANCE, "基弗突击队")

@@ -48,7 +48,7 @@ object CardEffectParser {
     }
 
     private fun areaTarget(text: String): EffectTarget? = when {
-        "所有敌方单位" in text || "全部敌方单位" in text || "所有敌方目标" in text -> EffectTarget.ENEMY_UNITS
+        "所有敌方单位" in text || "全部敌方单位" in text -> EffectTarget.ENEMY_UNITS
         "所有友方单位" in text || "全部友方单位" in text -> EffectTarget.FRIENDLY_UNITS
         "所有单位" in text || "全部单位" in text -> EffectTarget.ALL_UNITS
         "敌方总部" in text || "其总部" in text -> EffectTarget.ENEMY_HQ
@@ -59,13 +59,14 @@ object CardEffectParser {
     /** 单个目标按操作语义选择：增益默认友方，伤害与干扰默认敌方。 */
     private fun targetFor(op: EffectOp, text: String): EffectTarget {
         areaTarget(text)?.let { return it }
+        if ("所有敌方目标" in text && op == EffectOp.DAMAGE) return EffectTarget.ENEMY_UNITS
         if ("本单位" in text) return EffectTarget.SELF
         return when (op) {
             EffectOp.BUFF_ATTACK, EffectOp.BUFF_DEFENSE, EffectOp.REPAIR, EffectOp.HEAL_HQ ->
                 if ("敌方" in text) EffectTarget.ENEMY_ONE else EffectTarget.FRIENDLY_ONE
             EffectOp.DAMAGE, EffectOp.DESTROY, EffectOp.PIN, EffectOp.SUPPRESS,
             EffectOp.RETREAT, EffectOp.TAKE_CONTROL, EffectOp.COUNTER_DEPLOY ->
-                if ("友方" in text && "敌方" !in text) EffectTarget.FRIENDLY_ONE else EffectTarget.ENEMY_ONE
+                if ("友方" in text) EffectTarget.FRIENDLY_ONE else EffectTarget.ENEMY_ONE
             else -> EffectTarget.SELF
         }
     }
@@ -99,7 +100,7 @@ object CardEffectParser {
         }
         if ("消灭" in text) add(EffectOp.DESTROY)
         Regex("抽\\s*([0-9]+|[一二两三四五六七八九十]+)\\s*张").find(text)?.let { add(EffectOp.DRAW, number(text, "张"), EffectTarget.SELF) }
-        Regex("获得\\s*([0-9]+|[一二两三四五六七八九十]+)\\s*个指挥点").find(text)?.let { add(EffectOp.GAIN_KREDITS, number(text, "个指挥点"), EffectTarget.SELF) }
+        Regex("获得\\s*([0-9]+|[一二两三四五六七八九十]+)\\s*个指挥点(?!槽)").find(text)?.let { add(EffectOp.GAIN_KREDITS, number(text, "个指挥点"), EffectTarget.SELF) }
         Regex("获得\\s*([0-9]+|[一二两三四五六七八九十]+)\\s*个指挥点槽").find(text)?.let { add(EffectOp.GAIN_SLOTS, number(text, "个指挥点槽"), EffectTarget.SELF) }
         if ("失去" in text && "指挥点槽" in text) {
             val n = number(text, "个指挥点槽").coerceAtLeast(1)
@@ -140,7 +141,7 @@ object CardEffectParser {
         if ("攻击力为 0" in text || "攻击力为0" in text) add(EffectOp.SET_ATTACK, 0)
         if ("放回卡组顶" in text || "返回手牌" in text || "返回手中" in text) add(EffectOp.RETURN_HAND)
         if ("揭示" in text) add(EffectOp.REVEAL)
-        if ("复制" in text && "本回合被消灭" in text) add(EffectOp.COPY_DEAD_THIS_TURN)
+        if ("复制" in text && "被消灭" in text) add(EffectOp.COPY_DEAD_THIS_TURN)
         if ("反制其部署" in text) add(EffectOp.COUNTER_DEPLOY)
         return out
     }
