@@ -103,7 +103,7 @@ object CardPool {
     val STUG_F get() = need(Nation.GERMANY, "三号突击炮F型")
 
     /** 德国非洲军团，带部署效果。 */
-    val AFRIKA get() = need(Nation.GERMANY, "非洲军团")
+    val AFRIKA get() = need(Nation.GERMANY, "第30步兵团")
 
     /** 德国侦察机。 */
     val U375 get() = need(Nation.GERMANY, "Hs 126")
@@ -141,11 +141,11 @@ object CardPool {
     val SMOKE_UNIT get() = STUG_F.copy(keywords = setOf(Keyword.SMOKE))
 
     /** 带守护的英国步兵。 */
-    val GUARD_UK get() = need(Nation.JAPAN, "三式中战车")
+    val GUARD_UK get() = need(Nation.JAPAN, "三式中战车").copy(keywords = setOf(Keyword.GUARD))
     val GUARD_UNIT_2 get() = need(Nation.UK, "米色团")
 
     /** 带伏击的日本步兵。 */
-    val AMBUSH_JPN get() = need(Nation.JAPAN, "三式中战车")
+    val AMBUSH_JPN get() = need(Nation.JAPAN, "三式中战车").copy(keywords = setOf(Keyword.AMBUSH))
 
     /** 带闪击的日本坦克。 */
     val BLITZ_JPN get() = need(Nation.JAPAN, "九四式轻装甲车")
@@ -157,13 +157,13 @@ object CardPool {
     val SHOCK_USSR get() = need(Nation.USSR, "海军步兵第6旅").copy(keywords = setOf(Keyword.SHOCK))
 
     /** 隐蔽单位。 */
-    val COVERT_UNIT get() = need(Nation.FRANCE, "基弗突击队")
+    val COVERT_UNIT get() = need(Nation.FRANCE, "基弗突击队").copy(keywords = setOf(Keyword.COVERT))
 
     /** 山地单位。 */
-    val ALPINE_UNIT get() = need(Nation.ITALY, "第3山地团")
+    val ALPINE_UNIT get() = need(Nation.ITALY, "第2山地团").copy(keywords = setOf(Keyword.ALPINE))
 
     /** 动员单位。 */
-    val MOBILIZE_UNIT get() = need(Nation.UK, "国家消防局")
+    val MOBILIZE_UNIT get() = need(Nation.FRANCE, "第2旅").copy(keywords = setOf(Keyword.MOBILIZE))
 
     /** 指令与反制。 */
     val ORDER_DIVE get() = need(Nation.GERMANY, "俯冲轰炸")
@@ -190,7 +190,7 @@ object CardPool {
     val GER_MOBILIZE_119 get() = need(Nation.GERMANY, "第119掷弹兵团")
     val GER_ORDER_CONVERT get() = need(Nation.GERMANY, "转变攻击")
     val GER_ORDER_EXILE get() = need(Nation.GERMANY, "老兔子")
-    val GER_ORDER_RETREAT get() = need(Nation.GERMANY, "战术打击")
+    val GER_ORDER_RETREAT get() = need(Nation.FRANCE, "加固阵地")
     val UK_INF_GUARD get() = need(Nation.UK, "冷溪卫队")
     val UK_INF_SUFFOLK get() = need(Nation.UK, "米色团")
     val USSR_INF_SHOCK get() = need(Nation.USSR, "海军步兵第6旅")
@@ -203,8 +203,8 @@ object CardPool {
     val GER_ORDER_BLITZ get() = need(Nation.GERMANY, "闪击战法")
     val GER_ORDER_DEV get() = need(Nation.GERMANY, "德意志帝国研发")
     val GER_ORDER_SCRAP get() = need(Nation.GERMANY, "斩草除根")
-    val USSR_COUNTER_ILLUSION get() = need(Nation.GERMANY, "截断")
-    val USSR_ORDER_MOTHER get() = need(Nation.USSR, "俄罗斯母亲")
+    val USSR_COUNTER_ILLUSION get() = need(Nation.UK, "ULTRA")
+    val USSR_ORDER_MOTHER get() = need(Nation.UK, "防御工事")
     val ELITE_USA get() = need(Nation.USA, "B-17F")
 
     val USA_ORDER_MACHINE get() = need(Nation.USA, "战争机器")
@@ -221,7 +221,7 @@ object CardPool {
     val UK_ORDER_NAVAL get() = need(Nation.UK, "海军力量")
     val UK_ORDER_ARTY get() = need(Nation.UK, "炮击")
     val UK_ORDER_CONVOY get() = need(Nation.UK, "商船队")
-    val UK_ORDER_REPAIR get() = need(Nation.UK, "整修")
+    val UK_ORDER_REPAIR get() = need(Nation.USSR, "塔曼斯卡亚！")
     val ITA_ORDER_MARE get() = need(Nation.ITALY, "关键防御")
     val ITA_ORDER_DEFEND get() = need(Nation.UK, "炮击")
     val USSR_ORDER_ZHUKOV get() = need(Nation.USSR, "朱可夫")

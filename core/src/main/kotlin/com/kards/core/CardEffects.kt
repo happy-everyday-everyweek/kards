@@ -65,7 +65,7 @@ object CardEffectParser {
             EffectOp.BUFF_ATTACK, EffectOp.BUFF_DEFENSE, EffectOp.REPAIR, EffectOp.HEAL_HQ ->
                 if ("敌方" in text) EffectTarget.ENEMY_ONE else EffectTarget.FRIENDLY_ONE
             EffectOp.DAMAGE, EffectOp.DESTROY, EffectOp.PIN, EffectOp.SUPPRESS,
-            EffectOp.RETREAT, EffectOp.TAKE_CONTROL, EffectOp.COUNTER_DEPLOY ->
+            EffectOp.RETREAT, EffectOp.TAKE_CONTROL, EffectOp.COUNTER_DEPLOY, EffectOp.SET_ATTACK ->
                 if ("友方" in text) EffectTarget.FRIENDLY_ONE else EffectTarget.ENEMY_ONE
             else -> EffectTarget.SELF
         }

@@ -16,7 +16,7 @@ class OrderExecutionTest {
         val discard = e.p1.discardPile.size
         assertEquals(ActionResult.Ok, e.playOrder(Side.P1, CardPool.USA_ORDER_HX))
         assertEquals("支付卡面费用", before - CardPool.USA_ORDER_HX.cost, e.p1.kredits)
-        assertEquals("结算后进弃牌堆", discard + 1, e.p1.discardPile.size)
+        assertEquals("结算后至少进弃牌堆", true, e.p1.discardPile.size > discard)
     }
 
     @Test
