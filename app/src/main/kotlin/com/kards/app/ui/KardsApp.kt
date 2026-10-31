@@ -194,7 +194,7 @@ private fun BattleScreen(
                 )
 
                 Spacer(Modifier.height(4.dp))
-                ActionBar(game)
+                ActionBar(game, mission)
                 HandRow(game)
             }
         }
@@ -336,7 +336,7 @@ private fun UnitChip(
 }
 
 @Composable
-private fun ActionBar(game: GameController) {
+private fun ActionBar(game: GameController, mission: com.kards.app.game.Mission?) {
     Column(Modifier.padding(horizontal = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

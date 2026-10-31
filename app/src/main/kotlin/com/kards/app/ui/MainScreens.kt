@@ -78,13 +78,14 @@ fun CampaignScreen(progress: CampaignProgress, onSelect: (Campaign) -> Unit, onB
                         Text(campaign.subtitle, style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary)
                         Text(campaign.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("${campaign.nation.cn} 对阵 ${campaign.enemy.cn} · ${campaign.objective}")
+                        Text("${campaign.nation.cn} 对阵 ${campaign.enemy.cn} · ${campaign.missions.size} 个作战阶段 · ${campaign.strategies.size} 条策略")
                         Spacer(Modifier.height(10.dp))
+                        val earned = (1..5).sumOf { progress.stars(campaign.id, it) }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AssistChip(onClick = { onSelect(campaign) },
-                                label = { Text("历史战役 · 特殊任务待核实") })
+                                label = { Text("${campaign.strategies.size} 条策略 · 5 阶段") })
                             Spacer(Modifier.weight(1f))
-                            Text(if (progress.isCompleted(campaign.id)) "已通关" else "开始战役",
+                            Text(if (earned > 0) "★ $earned/15" else "开始战役",
                                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                         }
                     }
