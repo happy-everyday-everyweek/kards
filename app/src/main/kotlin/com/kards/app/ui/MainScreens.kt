@@ -162,9 +162,28 @@ fun CampaignDetailScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(mission.brief, style = MaterialTheme.typography.bodySmall)
-                        Text("目标：${mission.goal.cn} · " + if (stars > 0) "奖励已领取：${mission.reward}" else "奖励：${mission.reward}",
+                        Text(
+                            "任务：" + when (mission.goal) {
+                                MissionGoal.KILL_UNITS -> "结束你的回合时消灭至少 ${mission.goalAmount} 个敌方单位"
+                                MissionGoal.FRONT_UNITS -> "开始你的回合时前线拥有 ${mission.goalAmount} 个单位"
+                                MissionGoal.DESTROY_NAMED_HQ -> "摧毁${mission.goalTarget}总部"
+                                MissionGoal.DESTROY_HQ -> "摧毁敌方总部"
+                            },
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary)
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (mission.challenges.isNotEmpty()) {
+                            Text(
+                                mission.challenges.joinToString("　") { "☆ " + it.text },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            (if (mission.titleVerified) "" else "关卡名待核实 · ") + "奖励：" + mission.reward,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

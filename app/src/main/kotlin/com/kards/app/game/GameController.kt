@@ -44,9 +44,15 @@ class GameController(
         private set
     var kills by mutableStateOf(0)
         private set
+    var losses by mutableStateOf(0)
+        private set
     var survivedTurns by mutableStateOf(0)
         private set
+    var earnedStars by mutableStateOf(0)
+        private set
     private var missionWon = false
+    private var lastFriendlyIds: Set<Int> = emptySet()
+    private var lastEnemyIds: Set<Int> = emptySet()
 
     init { newGame() }
 
@@ -70,12 +76,16 @@ class GameController(
 
         frontTurns = 0
         kills = 0
+        losses = 0
         survivedTurns = 0
+        earnedStars = 0
         missionWon = false
         selectedHandIndex = -1
         selectedUnit = null
         resultText = null
         toast = null
+        lastFriendlyIds = engine.p1.allUnits().map { it.hashCode() }.toSet()
+        lastEnemyIds = engine.p2.allUnits().map { it.hashCode() }.toSet()
         refresh()
     }
 
@@ -103,7 +113,7 @@ class GameController(
     }
 
     private fun buildDeck(nation: Nation): Deck {
-        val pool = CardPool.ofNation(nation).filter { it.type != CardType.HQ && !it.reserved() }
+        val pool = CardPool.ofNation(nation).filter { it.type != CardType.HQ }
             .sortedBy { it.cost }
         require(pool.isNotEmpty()) { "${nation.cn} 没有可用卡牌" }
         val chosen = mutableListOf<Card>()
@@ -125,10 +135,9 @@ class GameController(
         return Deck(nation, CardPool.hqFor(nation), chosen.take(39))
     }
 
-    private fun Card.reserved(): Boolean = false
-
     fun refresh() {
         revision++
+        syncCounters()
         if (engine.finished && resultText == null) {
             resultText = when (engine.winner) {
                 Side.P1 -> finishMission()
@@ -138,37 +147,83 @@ class GameController(
         }
     }
 
+    /**
+     * 用场上单位快照差统计消灭与损失。
+     *
+     * 回到手牌的单位也会被计入一次损失，这与实机口径略有差异，
+     * 但比完全不统计更接近，且不会影响消灭数。
+     */
+    private fun syncCounters() {
+        val friendly = engine.p1.allUnits().map { it.hashCode() }.toSet()
+        val enemy = engine.p2.allUnits().map { it.hashCode() }.toSet()
+        losses += (lastFriendlyIds - friendly).size
+        kills += (lastEnemyIds - enemy).size
+        lastFriendlyIds = friendly
+        lastEnemyIds = enemy
+    }
+
+    private fun challengeMet(c: StarChallenge): Boolean = when (c.kind) {
+        ChallengeKind.LOSSES_AT_MOST -> losses <= c.amount
+        ChallengeKind.CONTROL_FRONT_AT_END -> engine.frontOwner == Side.P1
+        ChallengeKind.HQ_DEFENSE_AT_LEAST -> engine.p1.hq.defense >= c.amount
+        ChallengeKind.KILL_RATIO_AT_LEAST -> kills >= losses * c.amount.coerceAtLeast(1)
+        ChallengeKind.NO_FRONT_AT_WIN -> engine.frontOwner != Side.P1
+        ChallengeKind.KILLS_AT_LEAST -> kills >= c.amount
+    }
+
+    /** 星级等于达成的挑战条数；通关本身保底 1 星。 */
+    private fun starCount(): Int {
+        val m = mission ?: return 0
+        if (m.challenges.isEmpty()) return 1
+        return m.challenges.count { challengeMet(it) }.coerceIn(1, 3)
+    }
+
+    private fun objectiveReached(): Boolean {
+        val m = mission ?: return false
+        return when (m.goal) {
+            MissionGoal.KILL_UNITS -> kills >= m.goalAmount
+            MissionGoal.FRONT_UNITS -> engine.p1.front.size >= m.goalAmount
+            MissionGoal.DESTROY_NAMED_HQ -> engine.p2.hq.defense <= 0
+            MissionGoal.DESTROY_HQ -> engine.p2.hq.defense <= 0
+        }
+    }
+
     private fun finishMission(): String {
         missionWon = true
-        val stars = when {
-            engine.p1.hq.defense >= 15 -> 3
-            engine.p1.hq.defense >= 8 -> 2
-            else -> 1
-        }
+        val stars = starCount()
+        earnedStars = stars
         onMissionComplete(stars)
         return if (campaign != null) "战役胜利 · $stars 星" else "你赢了"
     }
 
-    private fun checkMission() {
+    /** 玩家在自己的回合结束时结算消灭类任务。 */
+    private fun checkObjectiveOnEndTurn() {
         if (missionWon || mission == null || engine.finished) return
-        val done = when (mission.goal) {
-            MissionGoal.DESTROY_HQ -> false
-            MissionGoal.CONTROL_FRONT -> frontTurns >= 3
-            MissionGoal.DESTROY_UNITS -> kills >= 8
-            MissionGoal.SURVIVE -> survivedTurns >= 8
-        }
-        if (done) {
-            missionWon = true
-            val stars = when {
-                engine.p1.hq.defense >= 15 -> 3
-                engine.p1.hq.defense >= 8 -> 2
-                else -> 1
-            }
-            onMissionComplete(stars)
-            resultText = "任务完成 · $stars 星"
-            revision++
-        }
+        if (mission.goal != MissionGoal.KILL_UNITS) return
+        if (!objectiveReached()) return
+        missionWon = true
+        val stars = starCount()
+        earnedStars = stars
+        onMissionComplete(stars)
+        resultText = "任务完成 · $stars 星"
+        revision++
     }
+
+    /** 玩家新回合开始时结算前线驻守类任务。 */
+    private fun checkObjectiveOnBeginTurn() {
+        if (missionWon || mission == null || engine.finished) return
+        if (mission.goal != MissionGoal.FRONT_UNITS) return
+        if (!objectiveReached()) return
+        missionWon = true
+        val stars = starCount()
+        earnedStars = stars
+        onMissionComplete(stars)
+        resultText = "任务完成 · $stars 星"
+        revision++
+    }
+
+    fun challengeStatus(): List<Pair<StarChallenge, Boolean>> =
+        mission?.challenges?.map { it to challengeMet(it) } ?: emptyList()
 
     private fun say(msg: String) { toast = msg; refresh() }
     fun clearToast() { toast = null }
@@ -201,17 +256,15 @@ class GameController(
         if (idx !in hand.indices) return
         val selected = hand[idx]
         val card = selected.card
-        trackKills {
-            when (val r = engine.deployUnit(Side.P1, card, line, selected.cost)) {
-                is ActionResult.Ok -> {
-                    if (idx < engine.p1.hand.size && engine.p1.hand[idx].card.id == card.id)
-                        engine.p1.hand.removeAt(idx)
-                    else engine.p1.hand.removeAll { it.card.id == card.id }
-                    selectedHandIndex = -1
-                    say("已部署 ${card.name}")
-                }
-                is ActionResult.Rejected -> say(r.reason)
+        when (val r = engine.deployUnit(Side.P1, card, line, selected.cost)) {
+            is ActionResult.Ok -> {
+                if (idx < engine.p1.hand.size && engine.p1.hand[idx].card.id == card.id)
+                    engine.p1.hand.removeAt(idx)
+                else engine.p1.hand.removeAll { it.card.id == card.id }
+                selectedHandIndex = -1
+                say("已部署 ${card.name}")
             }
+            is ActionResult.Rejected -> say(r.reason)
         }
     }
 
@@ -220,7 +273,7 @@ class GameController(
         if (idx !in hand.indices) return
         val card = hand[idx].card
         if (card.type != CardType.ORDER) { say("这不是指令卡"); return }
-        trackKills { applyOrder(card, Side.P1) }
+        applyOrder(card, Side.P1)
         selectedHandIndex = -1
     }
 
@@ -260,11 +313,9 @@ class GameController(
 
     fun attackEnemy(target: UnitInstance) {
         val u = selectedUnit ?: return
-        trackKills {
-            when (val r = engine.attack(Side.P1, u, target)) {
-                is ActionResult.Ok -> { selectedUnit = null; say("${u.card.name} 发起攻击") }
-                is ActionResult.Rejected -> say(r.reason)
-            }
+        when (val r = engine.attack(Side.P1, u, target)) {
+            is ActionResult.Ok -> { selectedUnit = null; say("${u.card.name} 发起攻击") }
+            is ActionResult.Rejected -> say(r.reason)
         }
     }
 
@@ -282,18 +333,11 @@ class GameController(
         selectedHandIndex = -1
         if (engine.frontOwner == Side.P1) frontTurns++
         survivedTurns++
+        checkObjectiveOnEndTurn()
+        if (missionWon) { refresh(); return }
         engine.endTurn()
         refresh()
-        checkMission()
         if (!engine.finished && !missionWon) botTurn()
-    }
-
-    private fun trackKills(block: () -> Unit) {
-        val before = engine.p2.allUnits().map { it.card.id to it.hashCode() }.toSet()
-        block()
-        val after = engine.p2.allUnits().map { it.card.id to it.hashCode() }.toSet()
-        kills += (before - after).size
-        checkMission()
     }
 
     private fun botTurn() {
@@ -381,7 +425,7 @@ class GameController(
 
         if (!engine.finished && !missionWon) engine.endTurn()
         refresh()
-        checkMission()
+        checkObjectiveOnBeginTurn()
     }
 
     private fun unitValue(c: Card): Int =

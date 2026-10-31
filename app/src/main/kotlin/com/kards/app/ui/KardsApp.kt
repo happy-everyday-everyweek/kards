@@ -368,14 +368,22 @@ private fun ActionBar(game: GameController, mission: com.kards.app.game.Mission?
 
         mission?.let { m ->
             val progressText = when (m.goal) {
-                com.kards.app.game.MissionGoal.CONTROL_FRONT -> "前线控制 ${game.frontTurns}/3"
-                com.kards.app.game.MissionGoal.DESTROY_UNITS -> "击杀 ${game.kills}/8"
-                com.kards.app.game.MissionGoal.SURVIVE -> "坚守 ${game.survivedTurns}/8"
+                com.kards.app.game.MissionGoal.KILL_UNITS -> "已消灭 ${game.kills}/${m.goalAmount}"
+                com.kards.app.game.MissionGoal.FRONT_UNITS -> "前线单位 ${game.myFront.size}/${m.goalAmount}"
+                com.kards.app.game.MissionGoal.DESTROY_NAMED_HQ -> "摧毁${m.goalTarget}总部"
                 com.kards.app.game.MissionGoal.DESTROY_HQ -> "摧毁敌方总部"
             }
-            Text("任务：${m.goal.cn} · $progressText",
+            Text("任务：$progressText",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary)
+            val stars = game.challengeStatus()
+            if (stars.isNotEmpty()) {
+                Text(
+                    stars.joinToString("　") { (c, ok) -> (if (ok) "★" else "☆") + c.text },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         val u = game.selectedUnit
