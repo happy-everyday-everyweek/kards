@@ -24,6 +24,8 @@ class PlayerState(val side: Side, val deck: Deck) {
     val activeCounters: MutableList<Card> = mutableListOf()
     var moraleCounter: Int = 0
     var fatigueDamageTotal: Int = 0
+    /** 本回合被消灭的友方单位，供俄罗斯母亲等卡面原文使用。 */
+    val destroyedThisTurn: MutableList<Card> = mutableListOf()
 
     fun allUnits(): List<UnitInstance> = support + front
 
@@ -505,11 +507,20 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         removeDead()
     }
 
+    /** 将单位移出战场并返回拥有者手牌，手牌满时按移除处理。 */
+    fun returnToHand(unit: UnitInstance) {
+        val owner = player(unit.owner)
+        owner.unitsOn(unit.line).remove(unit)
+        if (unit.line == Line.FRONT && owner.front.isEmpty() && frontOwner == unit.owner) frontOwner = null
+        if (owner.handHasRoom()) owner.hand += HandCard(unit.card)
+    }
+
     private fun removeDead() {
         for (s in listOf(p1, p2)) {
             s.allUnits().filter { !it.isAlive }.forEach { dead ->
                 s.unitsOn(dead.line).remove(dead)
                 s.discardPile += dead.card
+                s.destroyedThisTurn += dead.card
                 val hasDeathEffect = CardEffectParser.parse(dead.card).any { it.trigger == EffectTrigger.DESTRUCTION }
                 if (hasDeathEffect) {
                     emit("${dead.card.name} 触发亡计")
@@ -656,6 +667,9 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
     fun playOrder(side: Side, card: Card, target: UnitInstance? = null, costOverride: Int? = null): ActionResult {
         if (finished) return ActionResult.Rejected("对局已结束")
         if (side != active) return ActionResult.Rejected("不是 ${side.cn} 的回合")
+        if (card.type != CardType.COUNTERMEASURE) {
+            return ActionResult.Rejected("${card.name} 不是反制", RuleId.CARD_FOUR_TYPES)
+        }
         if (card.type != CardType.ORDER) {
             return ActionResult.Rejected("${card.name} 不是指令", RuleId.ORDER_ONE_SHOT)
         }

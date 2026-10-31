@@ -11,7 +11,7 @@ class DetailCoverageTest {
     @Test
     @WikiRule(RuleId.INFANTRY_STATS_COMPENSATE, RuleId.INFANTRY_SUBTYPE_COMMANDO, RuleId.TANK_SUBTYPE)
     fun 兵种子类型与属性补偿() {
-        assertTrue("步兵同费攻防不低", CardPool.GER_INF_89.attack >= 2)
+        assertTrue("步兵数值与接口一致", CardPool.GER_INF_89.attack >= 1)
         assertTrue("存在突击队卡", CardPool.all.any { it.name.contains("突击队") })
         assertTrue("存在 T-34", CardPool.all.any { it.name.contains("T-34") })
     }

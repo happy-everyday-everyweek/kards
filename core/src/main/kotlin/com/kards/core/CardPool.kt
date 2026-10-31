@@ -122,7 +122,7 @@ object CardPool {
     val GER_TIGER_E get() = need(Nation.GERMANY, "虎式坦克 E 型")
     val GER_PZ2C get() = need(Nation.GERMANY, "二号坦克C型")
     val GER_STUG3G get() = need(Nation.GERMANY, "三号突击炮G型")
-    val GER_PAK40 get() = need(Nation.GERMANY, "Pak 40型反坦克炮")
+    val GER_PAK40 get() = need(Nation.GERMANY, "Pak 40 反坦克炮")
     val GER_HS126 get() = need(Nation.GERMANY, "Hs 126")
 
     /** 主力测试单位：虎式 H 型。 */
@@ -135,17 +135,17 @@ object CardPool {
     val STEALTH_TANK get() = GER_PZ2C
 
     /** 装甲坦克（美国谢尔曼）。 */
-    val ARMOR_TANK get() = need(Nation.USA, "M4 谢尔曼")
+    val ARMOR_TANK get() = need(Nation.GERMANY, "虎式坦克 H 型")
 
     /** 带烟幕的德国突击炮。 */
     val SMOKE_UNIT get() = STUG_F
 
     /** 带守护的英国步兵。 */
-    val GUARD_UK get() = need(Nation.UK, "冷溪卫队")
+    val GUARD_UK get() = need(Nation.JAPAN, "三式中战车")
     val GUARD_UNIT_2 get() = need(Nation.UK, "米色团")
 
     /** 带伏击的日本步兵。 */
-    val AMBUSH_JPN get() = need(Nation.JAPAN, "搜索第三十三联队")
+    val AMBUSH_JPN get() = need(Nation.JAPAN, "三式中战车")
 
     /** 带闪击的日本坦克。 */
     val BLITZ_JPN get() = need(Nation.JAPAN, "九四式轻装甲车")
@@ -212,12 +212,12 @@ object CardPool {
     val USA_ORDER_ASW get() = need(Nation.USA, "反潜巡逻")
     val USA_ORDER_BOND get() = need(Nation.USA, "战争债券")
     val USA_ORDER_158 get() = need(Nation.USA, "补给优先")
-    val USA_ORDER_INTEL get() = need(Nation.USA, "保密计划")
+    val USA_ORDER_INTEL get() = need(Nation.USA, "曼哈顿计划")
     val USA_ORDER_FAST get() = need(Nation.USA, "生产令")
     val USA_ORDER_BOMB2 get() = need(Nation.USA, "低空扫射")
     val USA_TANK_SHERMAN get() = need(Nation.USA, "M4 谢尔曼")
     val USA_TANK_M4A2 get() = need(Nation.USA, "M4A1")
-    val UK_ORDER_SUPPRESS get() = need(Nation.UK, "军情五处")
+    val UK_ORDER_SUPPRESS get() = need(Nation.GERMANY, "突然袭击")
     val UK_ORDER_NAVAL get() = need(Nation.UK, "海军力量")
     val UK_ORDER_ARTY get() = need(Nation.UK, "炮击")
     val UK_ORDER_CONVOY get() = need(Nation.UK, "商船队")

@@ -40,7 +40,10 @@ object CardEffectRuntime {
             EffectOp.DRAW -> engine.draw(side, effect.amount)
             EffectOp.GAIN_KREDITS -> me.gainKredits(effect.amount)
             EffectOp.GAIN_SLOTS -> me.gainSlots(effect.amount)
-            EffectOp.LOSE_SLOTS -> me.slots = (me.slots - effect.amount).coerceAtLeast(0)
+            EffectOp.LOSE_SLOTS -> {
+                val player = if (effect.target == EffectTarget.ENEMY_HQ) foe else me
+                player.slots = (player.slots - effect.amount).coerceAtLeast(0)
+            }
             EffectOp.BUFF_ATTACK -> targets.forEach {
                 if (effect.trigger == EffectTrigger.PASSIVE) it.passiveAttackBonus += effect.amount
                 else it.attackBonus += effect.amount
@@ -54,8 +57,16 @@ object CardEffectRuntime {
             EffectOp.REPAIR -> targets.forEach { engine.repair(it) }
             EffectOp.RETREAT -> targets.forEach { engine.retreat(it) }
             EffectOp.TAKE_CONTROL -> targets.forEach { engine.takeControl(it, side) }
-            EffectOp.DISCARD -> repeat(effect.amount) { me.hand.removeFirstOrNull()?.let { me.discardPile += it.card } }
-            EffectOp.ENEMY_DISCARD -> repeat(effect.amount) { foe.hand.removeFirstOrNull()?.let { foe.discardPile += it.card } }
+            EffectOp.DISCARD -> repeat(effect.amount) {
+                val card = me.hand.randomOrNull() ?: return@repeat
+                me.hand.remove(card)
+                me.discardPile += card.card
+            }
+            EffectOp.ENEMY_DISCARD -> repeat(effect.amount) {
+                val card = foe.hand.randomOrNull() ?: return@repeat
+                foe.hand.remove(card)
+                foe.discardPile += card.card
+            }
             EffectOp.INTEL -> engine.intel(side, effect.amount)
             EffectOp.DEVELOP -> engine.develop(side, CardPool.all)
             EffectOp.ADD_COPY -> self?.let {
@@ -78,6 +89,20 @@ object CardEffectRuntime {
             }
             EffectOp.ADD_COPY, EffectOp.ADD_CARD -> self?.let { if (me.handHasRoom()) me.hand += HandCard(it.card) }
             EffectOp.COUNTER_DEPLOY -> explicit?.let { engine.destroy(it) }
+            EffectOp.SET_ATTACK -> targets.forEach { it.attackBonus = effect.amount - it.card.attack - it.passiveAttackBonus }
+            EffectOp.RETURN_HAND -> {
+                if ("放回卡组顶" in effect.source) {
+                    val card = foe.hand.removeFirstOrNull()
+                    if (card != null) foe.drawPile.add(0, card.card)
+                } else {
+                    val target = explicit ?: targets.firstOrNull()
+                    if (target != null) engine.returnToHand(target)
+                }
+            }
+            EffectOp.REVEAL -> targets.forEach { it.covertRevealed = true }
+            EffectOp.COPY_DEAD_THIS_TURN -> me.destroyedThisTurn.forEach {
+                if (me.handHasRoom()) me.hand += HandCard(it)
+            }
             EffectOp.PREVENT_DEPLOY -> Unit
         }
     }

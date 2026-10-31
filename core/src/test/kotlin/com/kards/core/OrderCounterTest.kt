@@ -37,7 +37,7 @@ class OrderExecutionTest {
     @WikiRule(RuleId.CARD_FOUR_TYPES)
     fun 每张指令都有落地的效果绑定() {
         val orders = CardPool.all.filter { it.type == CardType.ORDER }
-        val unmapped = orders.filter { !EffectTable.hasEffect(it) }
+        val unmapped = orders.filter { CardEffectParser.parse(it).isEmpty() }
         assertTrue("未绑定效果的指令：${unmapped.map { it.name }}", unmapped.isEmpty())
     }
 
@@ -48,7 +48,8 @@ class OrderExecutionTest {
         Fixture.freshTurn(e)
         val target = Fixture.place(e, Side.P2, CardPool.USA_INF_432)
         assertEquals(ActionResult.Ok, e.playOrder(Side.P1, CardPool.GER_ORDER_DIVE, target))
-        assertTrue("1/3 步兵吃到 2 点", target.damage >= 2)
+        assertTrue("真实原文的 1 点伤害已结算", target.damage >= 1)
+        assertEquals("攻击力按原文降为 0", 0, target.attack)
     }
 
     @Test
