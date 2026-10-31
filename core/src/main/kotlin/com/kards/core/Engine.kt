@@ -687,9 +687,6 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
     fun playOrder(side: Side, card: Card, target: UnitInstance? = null, costOverride: Int? = null): ActionResult {
         if (finished) return ActionResult.Rejected("对局已结束")
         if (side != active) return ActionResult.Rejected("不是 ${side.cn} 的回合")
-        if (card.type != CardType.COUNTERMEASURE) {
-            return ActionResult.Rejected("${card.name} 不是反制", RuleId.CARD_FOUR_TYPES)
-        }
         if (card.type != CardType.ORDER) {
             return ActionResult.Rejected("${card.name} 不是指令", RuleId.ORDER_ONE_SHOT)
         }
