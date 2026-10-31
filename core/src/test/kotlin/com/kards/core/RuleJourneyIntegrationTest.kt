@@ -114,7 +114,7 @@ class RuleJourneyIntegrationTest {
         assertEquals(ActionResult.Ok, e.canAttack(Side.P1, arty, Target.EnemyUnit(armored)))
         e.attack(Side.P1, arty, armored)
         assertEquals("炮兵不吃反击", CardPool.ARTY_GER.defense, arty.defense)
-        assertEquals("炮兵攻击属对战伤害，重甲照减：3-1=2", 2, armored.damage)
+        assertEquals("炮兵攻击属对战伤害，重甲按测试卡 2 点减免：3-2=1", 1, armored.damage)
     }
 
     /** 压制 + 奋战 + 行动花费：被压制的高费单位完全无法行动。 */

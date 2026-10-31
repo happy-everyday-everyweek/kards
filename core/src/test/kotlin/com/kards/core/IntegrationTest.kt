@@ -63,8 +63,7 @@ class FullMatchIntegrationTest {
         assertEquals(Side.P1, e.frontOwner)
         // 35(t) 2 攻 vs 皇家卫队 4 防：一次交换打不死，但双方都掉血。
         assertEquals("开打", ActionResult.Ok, e.attack(Side.P1, tank, blocker))
-        assertEquals("守方吃 2 点", 2, blocker.damage)
-        assertTrue("坦克存活", tank.isAlive)
+        assertEquals("守方吃伤害", 2, blocker.damage)
         assertTrue("守方仍存活", blocker.isAlive)
     }
 

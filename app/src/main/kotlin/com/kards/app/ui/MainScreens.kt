@@ -14,6 +14,9 @@ import com.kards.app.game.Campaign
 import com.kards.app.game.CampaignCatalog
 import com.kards.app.game.CampaignProgress
 import com.kards.app.game.DeckEditorState
+import com.kards.app.game.CampaignStrategy
+import com.kards.app.game.Mission
+import com.kards.app.game.MissionGoal
 import com.kards.core.CardType
 import com.kards.core.Nation
 
@@ -84,6 +87,82 @@ fun CampaignScreen(progress: CampaignProgress, onSelect: (Campaign) -> Unit, onB
                             Text(if (progress.isCompleted(campaign.id)) "已通关" else "开始战役",
                                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CampaignDetailScreen(
+    campaign: Campaign,
+    progress: CampaignProgress,
+    onStart: (Mission, CampaignStrategy) -> Unit,
+    onBack: () -> Unit
+) {
+    var selectedStrategyId by remember(campaign.id) {
+        mutableStateOf(progress.strategy(campaign.id) ?: campaign.strategies.first().id)
+    }
+    val strategy = campaign.strategies.first { it.id == selectedStrategyId }
+    var revision by remember { mutableIntStateOf(0) }
+    revision
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(campaign.title) },
+            navigationIcon = { TextButton(onClick = onBack) { Text("返回") } }
+        )
+    }) { padding ->
+        LazyColumn(Modifier.padding(padding), contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                Text("${campaign.nation.cn} 对阵 ${campaign.enemy.cn}",
+                    style = MaterialTheme.typography.titleMedium)
+                Text("选择一条策略路线，策略会改变整场战役的卡组加成。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    campaign.strategies.forEach { s ->
+                        val chosen = s.id == selectedStrategyId
+                        OutlinedCard(Modifier.fillMaxWidth().clickable {
+                            selectedStrategyId = s.id
+                            progress.selectStrategy(campaign.id, s.id)
+                            revision++
+                        }) {
+                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = chosen, onClick = {
+                                    selectedStrategyId = s.id
+                                    progress.selectStrategy(campaign.id, s.id)
+                                    revision++
+                                })
+                                Column(Modifier.weight(1f)) {
+                                    Text(s.name, fontWeight = FontWeight.SemiBold)
+                                    Text(s.description, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item { Text("作战阶段", style = MaterialTheme.typography.titleMedium) }
+            items(campaign.missions) { mission ->
+                val unlocked = mission.index <= progress.unlocked(campaign.id)
+                val stars = progress.stars(campaign.id, mission.index)
+                OutlinedCard(Modifier.fillMaxWidth().clickable(enabled = unlocked) {
+                    onStart(mission, strategy)
+                }) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(mission.title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text(if (!unlocked) "未解锁" else if (stars > 0) "★".repeat(stars) else "可挑战")
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(mission.brief, style = MaterialTheme.typography.bodySmall)
+                        Text("目标：${mission.goal.cn} · 奖励：${mission.reward}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }

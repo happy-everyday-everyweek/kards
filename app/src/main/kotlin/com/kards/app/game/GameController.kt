@@ -8,71 +8,70 @@ import com.kards.core.Card
 import com.kards.core.CardPool
 import com.kards.core.CardType
 import com.kards.core.Deck
-import com.kards.core.EffectTable
 import com.kards.core.Engine
 import com.kards.core.HandCard
+import com.kards.core.Keyword
 import com.kards.core.Line
 import com.kards.core.Nation
-import com.kards.core.OrderEffect
 import com.kards.core.Side
 import com.kards.core.Target
 import com.kards.core.UnitInstance
 import com.kards.core.UnitType
 
-/**
- * 一局人机对战的完整状态机。
- *
- * 规则骨架全部来自 core 里的 [Engine]（同一套代码被单元测试覆盖），
- * 这里只负责：把 UI 操作翻译成引擎调用、驱动 Bot 出牌、维护 Compose 可观察状态。
- */
 class GameController(
     private val campaign: Campaign? = null,
+    private val mission: Mission? = null,
+    private val strategy: CampaignStrategy? = null,
     private val customDeck: Deck? = null,
-    private val onVictory: () -> Unit = {}
+    private val onMissionComplete: (Int) -> Unit = {}
 ) {
-    private val playerNation = customDeck?.mainNation ?: campaign?.nation ?: Nation.GERMANY
+    private val playerNation = campaign?.nation ?: customDeck?.mainNation ?: Nation.GERMANY
 
-    /** 玩家选中的手牌（用于部署/使用）。 */
     var selectedHandIndex by mutableStateOf(-1)
         private set
-
-    /** 玩家选中的自己已上场单位（用于移动或攻击）。 */
     var selectedUnit by mutableStateOf<UnitInstance?>(null)
         private set
-
-    /** 对局结束提示。 */
     var resultText by mutableStateOf<String?>(null)
         private set
-
-    /** 给 UI 看的短提示。 */
     var toast by mutableStateOf<String?>(null)
         private set
-
     lateinit var engine: Engine
         private set
-
-    var playerIsFirst by mutableStateOf(true)
-        private set
-
-    /** 触发界面的重绘计数，引擎内部状态是可变对象，靠它通知 Compose。 */
     var revision by mutableStateOf(0)
         private set
 
-    init {
-        newGame()
-    }
+    var frontTurns by mutableStateOf(0)
+        private set
+    var kills by mutableStateOf(0)
+        private set
+    var survivedTurns by mutableStateOf(0)
+        private set
+    private var missionWon = false
+
+    init { newGame() }
 
     fun newGame() {
-        val p1Deck = customDeck?.let { Deck(it.mainNation, it.hq, it.cards.shuffled()) } ?: buildDeck(playerNation)
-        val botNation = botNationFor(playerNation)
-        val p2Deck = buildDeck(botNation)
+        val base = customDeck?.takeIf { campaign == null || it.mainNation == campaign.nation }
+            ?: buildDeck(playerNation)
+        val p1Deck = applyStrategy(base)
+        val p2Base = buildDeck(campaign?.enemy ?: botNationFor(playerNation))
+        val p2Deck = if ((mission?.enemyHqBonus ?: 0) > 0) {
+            p2Base.copy(hq = p2Base.hq.copy(defense = p2Base.hq.defense + mission!!.enemyHqBonus))
+        } else p2Base
 
-        engine = Engine(
-            Engine.newState(p1Deck, Side.P1),
-            Engine.newState(p2Deck, Side.P2)
-        )
-        engine.start(Side.P1)   // start 内部已经调用了 beginTurn，这里不能再重复调用
-        playerIsFirst = true
+        engine = Engine(Engine.newState(p1Deck, Side.P1), Engine.newState(p2Deck, Side.P2))
+        engine.start(Side.P1)
+
+        when (strategy?.bonus) {
+            StrategyBonus.START_SLOT -> engine.p1.gainSlots(strategy.amount)
+            StrategyBonus.SUPPLY_DRAW -> repeat(strategy.amount) { engine.draw(Side.P1) }
+            else -> Unit
+        }
+
+        frontTurns = 0
+        kills = 0
+        survivedTurns = 0
+        missionWon = false
         selectedHandIndex = -1
         selectedUnit = null
         resultText = null
@@ -83,21 +82,32 @@ class GameController(
     private fun botNationFor(player: Nation): Nation =
         campaign?.enemy ?: if (player == Nation.USSR) Nation.GERMANY else Nation.USSR
 
-    /**
-     * 用真实卡牌拼一套 40 张卡组：1 张总部 + 39 张。
-     * 按费用从低到高铺，保证 Bot 与玩家都有牌可出。
-     */
+    private fun applyStrategy(deck: Deck): Deck {
+        val s = strategy ?: return deck
+        val cards = deck.cards.map { c -> applyStrategyToCard(c, s) }
+        val hq = if (s.bonus == StrategyBonus.HQ_DEFENSE) deck.hq.copy(defense = deck.hq.defense + s.amount) else deck.hq
+        return Deck(deck.mainNation, hq, cards)
+    }
+
+    private fun applyStrategyToCard(c: Card, s: CampaignStrategy): Card = when (s.bonus) {
+        StrategyBonus.ELITE_ATTACK -> if (c.type == CardType.UNIT) c.copy(attack = c.attack + s.amount) else c
+        StrategyBonus.UNIT_DEFENSE -> if (c.type == CardType.UNIT) c.copy(defense = c.defense + s.amount) else c
+        StrategyBonus.INFANTRY_COST -> if (c.type == CardType.UNIT && c.unitType == UnitType.INFANTRY)
+            c.copy(cost = (c.cost - s.amount).coerceAtLeast(0)) else c
+        StrategyBonus.AIR_COST -> if (c.type == CardType.UNIT &&
+            (c.unitType == UnitType.FIGHTER || c.unitType == UnitType.BOMBER))
+            c.copy(cost = (c.cost - s.amount).coerceAtLeast(0)) else c
+        StrategyBonus.TANK_COST -> if (c.type == CardType.UNIT && c.unitType == UnitType.TANK)
+            c.copy(cost = (c.cost - s.amount).coerceAtLeast(0)) else c
+        else -> c
+    }
+
     private fun buildDeck(nation: Nation): Deck {
-        // 只用该国的真实卡。按费用升序，保证低费卡够用。
-        val pool = CardPool.ofNation(nation)
-            .filter { it.type != CardType.HQ }
+        val pool = CardPool.ofNation(nation).filter { it.type != CardType.HQ && !it.reserved() }
             .sortedBy { it.cost }
         require(pool.isNotEmpty()) { "${nation.cn} 没有可用卡牌" }
-
         val chosen = mutableListOf<Card>()
-        // 同名上限按「卡名」判定（数据源里同名卡可能有多个条目）
         fun countOf(name: String) = chosen.count { it.name == name }
-
         var guard = 0
         while (chosen.size < 39 && guard++ < 10000) {
             var added = false
@@ -110,37 +120,58 @@ class GameController(
             }
             if (!added) break
         }
-        // 极端情况下（可选卡太少）用低费卡补满，保证能开局
         var i = 0
-        while (chosen.size < 39) {
-            chosen += pool[i % pool.size]
-            i++
-        }
+        while (chosen.size < 39) { chosen += pool[i % pool.size]; i++ }
         return Deck(nation, CardPool.hqFor(nation), chosen.take(39))
     }
+
+    private fun Card.reserved(): Boolean = false
 
     fun refresh() {
         revision++
         if (engine.finished && resultText == null) {
             resultText = when (engine.winner) {
-                Side.P1 -> {
-                if (campaign != null) onVictory()
-                "战役胜利"
-            }
-                Side.P2 -> "Bot 获胜"
+                Side.P1 -> finishMission()
+                Side.P2 -> "战役失败"
                 else -> "对局结束"
             }
         }
     }
 
-    private fun say(msg: String) {
-        toast = msg
-        refresh()
+    private fun finishMission(): String {
+        missionWon = true
+        val stars = when {
+            engine.p1.hq.defense >= 15 -> 3
+            engine.p1.hq.defense >= 8 -> 2
+            else -> 1
+        }
+        onMissionComplete(stars)
+        return if (campaign != null) "战役胜利 · $stars 星" else "你赢了"
     }
 
-    fun clearToast() {
-        toast = null
+    private fun checkMission() {
+        if (missionWon || mission == null || engine.finished) return
+        val done = when (mission.goal) {
+            MissionGoal.DESTROY_HQ -> false
+            MissionGoal.CONTROL_FRONT -> frontTurns >= 3
+            MissionGoal.DESTROY_UNITS -> kills >= 8
+            MissionGoal.SURVIVE -> survivedTurns >= 8
+        }
+        if (done) {
+            missionWon = true
+            val stars = when {
+                engine.p1.hq.defense >= 15 -> 3
+                engine.p1.hq.defense >= 8 -> 2
+                else -> 1
+            }
+            onMissionComplete(stars)
+            resultText = "任务完成 · $stars 星"
+            revision++
+        }
     }
+
+    private fun say(msg: String) { toast = msg; refresh() }
+    fun clearToast() { toast = null }
 
     val hand: List<HandCard> get() = engine.p1.hand
     val mySupport: List<UnitInstance> get() = engine.p1.support
@@ -151,9 +182,7 @@ class GameController(
     val enemyHqDefense: Int get() = engine.p2.hq.defense
     val myKredits: Int get() = engine.p1.kredits
     val mySlots: Int get() = engine.p1.slots
-    val isMyTurn: Boolean get() = engine.active == Side.P1 && !engine.finished
-
-    // —————————————————— 玩家操作 ——————————————————
+    val isMyTurn: Boolean get() = engine.active == Side.P1 && !engine.finished && !missionWon
 
     fun selectHand(index: Int) {
         selectedHandIndex = if (selectedHandIndex == index) -1 else index
@@ -167,64 +196,50 @@ class GameController(
         refresh()
     }
 
-    /** 点击手牌后，选择部署到某条阵线。 */
     fun deploySelected(line: Line) {
         val idx = selectedHandIndex
         if (idx !in hand.indices) return
         val selected = hand[idx]
         val card = selected.card
-        val r = engine.deployUnit(Side.P1, card, line, selected.cost)
-        when (r) {
-            is ActionResult.Ok -> {
-                // 引擎只负责战场结算，手牌移除由调用方处理，并从指定位置删掉这一张
-                if (idx < engine.p1.hand.size && engine.p1.hand[idx].card.id == card.id) {
-                    engine.p1.hand.removeAt(idx)
-                } else {
-                    engine.p1.hand.removeAll { it.card.id == card.id }
+        trackKills {
+            when (val r = engine.deployUnit(Side.P1, card, line, selected.cost)) {
+                is ActionResult.Ok -> {
+                    if (idx < engine.p1.hand.size && engine.p1.hand[idx].card.id == card.id)
+                        engine.p1.hand.removeAt(idx)
+                    else engine.p1.hand.removeAll { it.card.id == card.id }
+                    selectedHandIndex = -1
+                    say("已部署 ${card.name}")
                 }
-                selectedHandIndex = -1
-                say("已部署 ${card.name}")
+                is ActionResult.Rejected -> say(r.reason)
             }
-            is ActionResult.Rejected -> say(r.reason)
         }
     }
 
-    /** 支付指挥点使用指令。 */
     fun playSelectedOrder() {
         val idx = selectedHandIndex
         if (idx !in hand.indices) return
         val card = hand[idx].card
-        if (card.type != CardType.ORDER) {
-            say("这不是指令卡")
-            return
-        }
-        applyOrder(card, Side.P1)
+        if (card.type != CardType.ORDER) { say("这不是指令卡"); return }
+        trackKills { applyOrder(card, Side.P1) }
         selectedHandIndex = -1
     }
 
     private fun applyOrder(card: Card, side: Side) {
         val p = engine.player(side)
-        val handCard = p.hand.firstOrNull { it.card.id == card.id }
-        val cost = handCard?.cost ?: card.cost
-        when (val r = engine.playOrder(side, card, costOverride = cost)) {
-            is ActionResult.Ok -> {
-                val hi = p.hand.indexOfFirst { it.card.id == card.id }
-                if (hi >= 0) p.hand.removeAt(hi)
-                say("使用了 ${card.name}")
-            }
-            is ActionResult.Rejected -> say(r.reason)
-        }
+        val hc = p.hand.firstOrNull { it.card.id == card.id }
+        val r = engine.playOrder(side, card, costOverride = hc?.cost ?: card.cost)
+        if (r is ActionResult.Ok) {
+            val hi = p.hand.indexOfFirst { it.card.id == card.id }
+            if (hi >= 0) p.hand.removeAt(hi)
+            say("使用了 ${card.name}")
+        } else if (r is ActionResult.Rejected) say(r.reason)
     }
 
-    /** 激活手牌中的反制：支付费用并挂起，等待对手触发。 */
     fun playSelectedCounter() {
         val idx = selectedHandIndex
         if (idx !in hand.indices) return
         val card = hand[idx].card
-        if (card.type != CardType.COUNTERMEASURE) {
-            say("这不是反制卡")
-            return
-        }
+        if (card.type != CardType.COUNTERMEASURE) { say("这不是反制卡"); return }
         when (val r = engine.activateCounter(Side.P1, card)) {
             is ActionResult.Ok -> {
                 if (idx in engine.p1.hand.indices) engine.p1.hand.removeAt(idx)
@@ -235,7 +250,6 @@ class GameController(
         }
     }
 
-    /** 移动选中的单位到另一条阵线。 */
     fun moveSelectedTo(line: Line) {
         val u = selectedUnit ?: return
         when (val r = engine.moveUnit(Side.P1, u, line)) {
@@ -244,136 +258,148 @@ class GameController(
         }
     }
 
-    /** 选中的单位攻击敌方某个单位。 */
     fun attackEnemy(target: UnitInstance) {
         val u = selectedUnit ?: return
-        when (val r = engine.attack(Side.P1, u, target)) {
-            is ActionResult.Ok -> {
-                selectedUnit = null
-                say("${u.card.name} 发起攻击")
+        trackKills {
+            when (val r = engine.attack(Side.P1, u, target)) {
+                is ActionResult.Ok -> { selectedUnit = null; say("${u.card.name} 发起攻击") }
+                is ActionResult.Rejected -> say(r.reason)
             }
-            is ActionResult.Rejected -> say(r.reason)
         }
     }
 
-    /** 选中的单位攻击敌方总部。 */
     fun attackEnemyHq() {
         val u = selectedUnit ?: return
         when (val r = engine.attackHq(Side.P1, u)) {
-            is ActionResult.Ok -> {
-                selectedUnit = null
-                say("${u.card.name} 攻击敌方总部")
-            }
+            is ActionResult.Ok -> { selectedUnit = null; say("${u.card.name} 攻击敌方总部") }
             is ActionResult.Rejected -> say(r.reason)
         }
     }
 
-    /** 结束回合，然后让 Bot 行动。 */
     fun endTurn() {
         if (!isMyTurn) return
         selectedUnit = null
         selectedHandIndex = -1
+        if (engine.frontOwner == Side.P1) frontTurns++
+        survivedTurns++
         engine.endTurn()
         refresh()
-        if (!engine.finished) botTurn()
+        checkMission()
+        if (!engine.finished && !missionWon) botTurn()
     }
 
-    // —————————————————— Bot ——————————————————
+    private fun trackKills(block: () -> Unit) {
+        val before = engine.p2.allUnits().map { it.card.id to it.hashCode() }.toSet()
+        block()
+        val after = engine.p2.allUnits().map { it.card.id to it.hashCode() }.toSet()
+        kills += (before - after).size
+        checkMission()
+    }
 
     private fun botTurn() {
         val bot = engine.p2
-        var guard = 0
-        // 优先用高费高质量单位铺满费用曲线，而不是无脑从最低费开始出。
-        while (guard++ < 30) {
+        // 1. 先检查斩杀。
+        val lethal = bot.allUnits().sumOf { a ->
+            if (engine.canAttack(Side.P2, a, Target.EnemyHq(Side.P1)) is ActionResult.Ok) a.attack else 0
+        } >= engine.p1.hq.defense
+        if (lethal) {
+            bot.allUnits().toList().forEach { a ->
+                if (!engine.finished && engine.canAttack(Side.P2, a, Target.EnemyHq(Side.P1)) is ActionResult.Ok)
+                    engine.attackHq(Side.P2, a)
+            }
+        }
+
+        // 2. 使用低费过牌与资源指令，再保留费用给单位。
+        var orderGuard = 0
+        while (!engine.finished && orderGuard++ < 8) {
+            val playable = bot.hand.mapIndexed { i, h -> i to h }
+                .filter { it.second.card.type == CardType.ORDER && it.second.cost <= bot.kredits }
+                .sortedBy { it.second.cost }
+                .firstOrNull() ?: break
+            val (index, hc) = playable
+            val card = hc.card
+            val useful = card.cost == 0 || card.attack > 0 || card.defense > 0 ||
+                card.effectText.contains("抽") || card.effectText.contains("指挥点") ||
+                card.effectText.contains("伤害") || card.effectText.contains("消灭") ||
+                card.effectText.contains("压制") || card.effectText.contains("抑制")
+            if (!useful) break
+            if (engine.playOrder(Side.P2, card, costOverride = hc.cost) !is ActionResult.Ok) break
+            if (index in bot.hand.indices) bot.hand.removeAt(index)
+        }
+
+        // 3. 按站场价值部署，优先补充前线。
+        var deployGuard = 0
+        while (!engine.finished && deployGuard++ < 20) {
             val playable = bot.hand.mapIndexed { i, h -> i to h }
                 .filter { it.second.card.type == CardType.UNIT && it.second.cost <= bot.kredits }
-                .sortedWith(compareByDescending<Pair<Int, HandCard>> {
-                    it.second.card.cost + it.second.card.attack + it.second.card.defense
-                }.thenBy { it.second.cost })
-            if (playable.isEmpty()) break
-            val (index, handCard) = playable.first()
-            val card = handCard.card
-            val line = if (engine.frontOwner != Side.P1 && bot.frontHasRoom() &&
-                card.unitType != UnitType.ARTILLERY) Line.FRONT else Line.SUPPORT
-            val result = engine.deployUnit(Side.P2, card, line, handCard.cost)
-            if (result !is ActionResult.Ok &&
-                engine.deployUnit(Side.P2, card, Line.SUPPORT, handCard.cost) !is ActionResult.Ok) break
-            bot.hand.removeAt(index)
-            refresh()
+                .sortedByDescending { unitValue(it.second.card) }
+                .firstOrNull() ?: break
+            val (index, hc) = playable
+            val card = hc.card
+            val preferFront = engine.frontOwner != Side.P1 && bot.frontHasRoom() &&
+                card.unitType != UnitType.ARTILLERY
+            val line = if (preferFront) Line.FRONT else Line.SUPPORT
+            val ok = engine.deployUnit(Side.P2, card, line, hc.cost)
+            if (ok is ActionResult.Ok) {
+                if (index in bot.hand.indices) bot.hand.removeAt(index)
+            } else if (engine.deployUnit(Side.P2, card, Line.SUPPORT, hc.cost) is ActionResult.Ok) {
+                if (index in bot.hand.indices) bot.hand.removeAt(index)
+            } else break
         }
 
-        // 余下费用继续使用指令；反制留待玩家手动激活，Bot 不盲目消耗。
-        var orderGuard = 0
-        while (orderGuard++ < 10) {
-            val playableOrder = bot.hand.mapIndexed { i, h -> i to h }
-                .filter { it.second.card.type == CardType.ORDER && it.second.cost <= bot.kredits }
-                .maxByOrNull { it.second.cost }
-                ?: break
-            val (index, handCard) = playableOrder
-            if (engine.playOrder(Side.P2, handCard.card, costOverride = handCard.cost) !is ActionResult.Ok) break
-            if (index in bot.hand.indices) bot.hand.removeAt(index)
-            refresh()
-        }
-        if (engine.finished) {
-            refresh()
-            return
-        }
+        // 4. 近战单位争夺空前线（保留攻击费用）。
+        bot.support.filter { (it.unitType == UnitType.INFANTRY || it.tankLike) && it.actionCost <= bot.kredits }
+            .forEach { if (engine.frontOwner != Side.P1 && bot.frontHasRoom()) engine.moveUnit(Side.P2, it, Line.FRONT) }
 
-        // 支援阵线的近战单位主动争夺空前线，保留行动点用于攻击。
-        bot.support.filter { it.unitType == UnitType.INFANTRY || it.tankLike }.forEach { unit ->
-            if (engine.frontOwner != Side.P1 && bot.frontHasRoom()) {
-                engine.moveUnit(Side.P2, unit, Line.FRONT)
-            }
-        }
-
+        // 5. 价值最高的合法攻击，直到无正收益动作。
         var attacks = 0
-        while (!engine.finished && attacks++ < 30) {
-            val action = bot.allUnits().flatMap { attacker ->
-                val targets = engine.p1.allUnits().map { target ->
-                    val canWin = attacker.attack >= target.defense + target.armorValue
-                    val survives = attacker.defense > target.attack || !target.isAlive
-                    val score = when {
-                        canWin && survives -> 1000 + target.attack * 8 + target.defense
-                        canWin -> 450 + target.attack * 6
-                        target.attack == 0 -> 150
-                        else -> -200 + attacker.attack - target.attack
+        while (!engine.finished && attacks++ < 40) {
+            val actions = bot.allUnits().flatMap { attacker ->
+                val unitActions = engine.p1.allUnits().map { target ->
+                    val canKill = attacker.attack >= target.defense + target.armorValue
+                    val survives = attacker.defense > target.attack
+                    val value = when {
+                        canKill && survives -> 900 + target.attack * 10 + target.defense * 3
+                        canKill -> 500 + target.attack * 8
+                        target.attack == 0 -> 200 + attacker.attack
+                        survives -> 100 + target.defense
+                        else -> -150
                     }
-                    BotAttack(attacker, Target.EnemyUnit(target), score)
-                } + BotAttack(
-                    attacker, Target.EnemyHq(Side.P1),
-                    if (engine.p1.hq.defense <= attacker.attack) 10000 else 500 + attacker.attack * 3
-                )
-                targets.filter { engine.canAttack(Side.P2, it.attacker, it.target) is ActionResult.Ok }
-            }.maxByOrNull { it.score }
-            if (action == null || (action.score < 0 && engine.p1.hq.defense > 6)) break
-            when (val target = action.target) {
-                is Target.EnemyUnit -> engine.attack(Side.P2, action.attacker, target.unit)
-                is Target.EnemyHq -> engine.attackHq(Side.P2, action.attacker)
+                    BotAttack(attacker, Target.EnemyUnit(target), value)
+                }
+                val hq = BotAttack(attacker, Target.EnemyHq(Side.P1),
+                    if (engine.p1.hq.defense <= attacker.attack) 100000 else 350 + attacker.attack * 5)
+                (unitActions + hq)
+            }.filter { engine.canAttack(Side.P2, it.attacker, it.target) is ActionResult.Ok }
+            val best = actions.maxByOrNull { it.score } ?: break
+            if (best.score < 0) break
+            when (val t = best.target) {
+                is Target.EnemyUnit -> engine.attack(Side.P2, best.attacker, t.unit)
+                is Target.EnemyHq -> engine.attackHq(Side.P2, best.attacker)
             }
-            refresh()
         }
-        if (!engine.finished) engine.endTurn()
+
+        if (!engine.finished && !missionWon) engine.endTurn()
         refresh()
+        checkMission()
     }
 
-    private data class BotAttack(
-        val attacker: UnitInstance,
-        val target: Target,
-        val score: Int
-    )
+    private fun unitValue(c: Card): Int =
+        c.attack * 3 + c.defense * 2 + c.cost * 2 +
+            (if (c.has(Keyword.GUARD)) 4 else 0) +
+            (if (c.has(Keyword.BLITZ)) 3 else 0) +
+            (if (c.has(Keyword.AMBUSH)) 2 else 0) +
+            (if (c.has(Keyword.FURY)) 3 else 0)
 
-    // —————————————————— 供 UI 显示 ——————————————————
+    private data class BotAttack(val attacker: UnitInstance, val target: Target, val score: Int)
 
     fun cardBadge(card: Card): String = buildString {
         append(card.cost).append('K')
-        if (card.type == CardType.UNIT) {
-            append("  ").append(card.attack).append('/').append(card.defense)
-        }
+        if (card.type == CardType.UNIT) append("  ").append(card.attack).append('/').append(card.defense)
     }
 
     fun unitLabel(u: UnitInstance): String = buildString {
-        append(u.card.name)
-        append("  ").append(u.attack).append('/').append(u.defense)
+        append(u.card.name).append("  ").append(u.attack).append('/').append(u.defense)
         if (u.damage > 0) append(" (-").append(u.damage).append(')')
     }
 

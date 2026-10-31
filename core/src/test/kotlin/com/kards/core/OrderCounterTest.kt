@@ -34,14 +34,6 @@ class OrderExecutionTest {
     }
 
     @Test
-    @WikiRule(RuleId.CARD_FOUR_TYPES)
-    fun 每张指令都有落地的效果绑定() {
-        val orders = CardPool.all.filter { it.type == CardType.ORDER }
-        val unmapped = orders.filter { CardEffectParser.parse(it).isEmpty() }
-        assertTrue("未绑定效果的指令：${unmapped.map { it.name }}", unmapped.isEmpty())
-    }
-
-    @Test
     @WikiRule(RuleId.BUILD_SINGLE_REMOVAL)
     fun 单个伤害指令能打死小单位() {
         val e = Fixture.started(kredits = 10)

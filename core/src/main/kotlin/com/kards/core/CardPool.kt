@@ -193,7 +193,7 @@ object CardPool {
     val GER_ORDER_RETREAT get() = need(Nation.FRANCE, "加固阵地")
     val UK_INF_GUARD get() = need(Nation.JAPAN, "三式中战车").copy(keywords = setOf(Keyword.GUARD))
     val UK_INF_SUFFOLK get() = need(Nation.UK, "米色团")
-    val USSR_INF_SHOCK get() = need(Nation.USSR, "海军步兵第6旅")
+    val USSR_INF_SHOCK get() = need(Nation.USSR, "海军步兵第6旅").copy(keywords = setOf(Keyword.SHOCK))
     val JPN_INF_AMBUSH get() = need(Nation.JAPAN, "三式中战车").copy(keywords = setOf(Keyword.AMBUSH))
     val FRA_INF_RESIST get() = need(Nation.FRANCE, "基弗突击队")
     val GER_ALPINE_141 get() = need(Nation.GERMANY, "第141山地猎兵团")

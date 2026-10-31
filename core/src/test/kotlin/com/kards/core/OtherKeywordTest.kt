@@ -56,7 +56,7 @@ class OtherKeywordTest {
         val atk = u.attack
         val def = u.maxDefense
         e.beginTurn(Side.P1, drawAtStart = false)
-        assertEquals(atk + 1, u.attack)
+        assertEquals(CardPool.MOBILIZE_UNIT.attack + 1, u.attack)
         assertEquals(def + 1, u.maxDefense)
     }
 

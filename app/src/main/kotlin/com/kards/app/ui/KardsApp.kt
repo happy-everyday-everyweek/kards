@@ -63,22 +63,35 @@ fun KardsApp() {
     val editor = remember { com.kards.app.game.DeckEditorState(context) }
     var screen by remember { mutableStateOf("home") }
     var campaign by remember { mutableStateOf<com.kards.app.game.Campaign?>(null) }
+    var mission by remember { mutableStateOf<com.kards.app.game.Mission?>(null) }
+    var strategy by remember { mutableStateOf<com.kards.app.game.CampaignStrategy?>(null) }
     var progressRevision by remember { mutableIntStateOf(0) }
     when (screen) {
         "home" -> HomeScreen(progress.completedCount(), editor.isReady,
-            { screen = "campaigns" }, { screen = "deck" }, { campaign = null; screen = "battle" })
-        "campaigns" -> CampaignScreen(progress, { campaign = it; screen = "battle" }, { screen = "home" })
+            { screen = "campaigns" }, { screen = "deck" },
+            { campaign = null; mission = null; strategy = null; screen = "battle" })
+        "campaigns" -> CampaignScreen(progress, { campaign = it; screen = "campaignDetail" }, { screen = "home" })
+        "campaignDetail" -> {
+            progressRevision
+            val current = campaign
+            if (current != null) {
+                CampaignDetailScreen(current, progress,
+                    onStart = { m, s -> mission = m; strategy = s; screen = "battle" },
+                    onBack = { screen = "campaigns" })
+            }
+        }
         "deck" -> DeckEditorScreen(editor) { screen = "home" }
         else -> {
             progressRevision
             val current = campaign
-            BattleScreen(current, editor.toDeck(), {
-                if (current != null) {
-                    progress.complete(current.id)
+            val currentMission = mission
+            BattleScreen(current, currentMission, strategy, editor.toDeck(), { stars ->
+                if (current != null && currentMission != null) {
+                    progress.complete(current.id, currentMission.index, stars)
                 }
                 progressRevision++
             }) {
-                screen = if (current != null) "campaigns" else "home"
+                screen = if (current != null) "campaignDetail" else "home"
             }
         }
     }
@@ -88,11 +101,15 @@ fun KardsApp() {
 @Composable
 private fun BattleScreen(
     campaign: com.kards.app.game.Campaign?,
+    mission: com.kards.app.game.Mission?,
+    strategy: com.kards.app.game.CampaignStrategy?,
     deck: com.kards.core.Deck?,
-    onVictory: () -> Unit,
+    onMissionComplete: (Int) -> Unit,
     onExit: () -> Unit
 ) {
-    val game = remember(campaign, deck) { GameController(campaign, deck, onVictory) }
+    val game = remember(campaign, mission, strategy, deck) {
+        GameController(campaign, mission, strategy, deck, onMissionComplete)
+    }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(game.revision, game.toast) {
@@ -109,7 +126,7 @@ private fun BattleScreen(
                 title = {
                     Column {
                         Text("KARDS", fontWeight = FontWeight.SemiBold)
-                        Text(campaign?.title ?: "快速人机对战 · 离线规则引擎",
+                        Text(mission?.title ?: campaign?.title ?: "快速人机对战 · 离线规则引擎",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -348,6 +365,18 @@ private fun ActionBar(game: GameController) {
         }
 
         Spacer(Modifier.height(6.dp))
+
+        mission?.let { m ->
+            val progressText = when (m.goal) {
+                com.kards.app.game.MissionGoal.CONTROL_FRONT -> "前线控制 ${game.frontTurns}/3"
+                com.kards.app.game.MissionGoal.DESTROY_UNITS -> "击杀 ${game.kills}/8"
+                com.kards.app.game.MissionGoal.SURVIVE -> "坚守 ${game.survivedTurns}/8"
+                com.kards.app.game.MissionGoal.DESTROY_HQ -> "摧毁敌方总部"
+            }
+            Text("任务：${m.goal.cn} · $progressText",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary)
+        }
 
         val u = game.selectedUnit
         if (u != null) {
