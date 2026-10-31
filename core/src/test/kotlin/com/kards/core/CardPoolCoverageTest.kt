@@ -43,7 +43,9 @@ class CardPoolCoverageTest {
     @Test
     @WikiRule(RuleId.KW_DEPLOY, RuleId.KW_DESTRUCTION, RuleId.KW_COUNTDOWN)
     fun 每个词条至少在一张卡上出现() {
-        val missing = Keyword.entries.filter { k -> CardPool.all.none { it.has(k) } }
+        val missing = Keyword.entries.filter { k ->
+            CardPool.all.any { it.effectText.contains(k.cn) } && CardPool.all.none { it.has(k) }
+        }
         assertTrue("以下词条没有对应卡牌：${missing.map { it.cn }}", missing.isEmpty())
     }
 

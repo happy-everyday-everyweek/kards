@@ -91,7 +91,7 @@ object CardPool {
     val INF_432 get() = need(Nation.USA, "第 32 步兵团").copy(defense = 4)
 
     /** 德国 2 费装甲掷弹兵。 */
-    val PZ_GREN get() = need(Nation.GERMANY, "第59装甲掷弹兵团")
+    val PZ_GREN get() = need(Nation.GERMANY, "第59装甲掷弹兵团").copy(actionCost = 1)
 
     /** 德国轻坦。 */
     val TANK_35T get() = need(Nation.GERMANY, "35(t)坦克")
@@ -157,7 +157,7 @@ object CardPool {
     val SHOCK_USSR get() = need(Nation.USSR, "海军步兵第6旅").copy(keywords = setOf(Keyword.SHOCK))
 
     /** 隐蔽单位。 */
-    val COVERT_UNIT get() = need(Nation.FRANCE, "基弗突击队").copy(keywords = setOf(Keyword.COVERT))
+    val COVERT_UNIT get() = need(Nation.FRANCE, "基弗突击队").copy(keywords = setOf(Keyword.COVERT), actionCost = 1)
 
     /** 山地单位。 */
     val ALPINE_UNIT get() = need(Nation.ITALY, "第2山地团").copy(keywords = setOf(Keyword.ALPINE))
@@ -191,10 +191,10 @@ object CardPool {
     val GER_ORDER_CONVERT get() = need(Nation.GERMANY, "转变攻击")
     val GER_ORDER_EXILE get() = need(Nation.GERMANY, "老兔子")
     val GER_ORDER_RETREAT get() = need(Nation.FRANCE, "加固阵地")
-    val UK_INF_GUARD get() = need(Nation.UK, "冷溪卫队")
+    val UK_INF_GUARD get() = need(Nation.JAPAN, "三式中战车").copy(keywords = setOf(Keyword.GUARD))
     val UK_INF_SUFFOLK get() = need(Nation.UK, "米色团")
     val USSR_INF_SHOCK get() = need(Nation.USSR, "海军步兵第6旅")
-    val JPN_INF_AMBUSH get() = need(Nation.JAPAN, "搜索第三十三联队")
+    val JPN_INF_AMBUSH get() = need(Nation.JAPAN, "三式中战车").copy(keywords = setOf(Keyword.AMBUSH))
     val FRA_INF_RESIST get() = need(Nation.FRANCE, "基弗突击队")
     val GER_ALPINE_141 get() = need(Nation.GERMANY, "第141山地猎兵团")
     val GER_BF110 get() = need(Nation.GERMANY, "Bf 110 C")
@@ -212,12 +212,12 @@ object CardPool {
     val USA_ORDER_ASW get() = need(Nation.USA, "反潜巡逻")
     val USA_ORDER_BOND get() = need(Nation.USA, "战争债券")
     val USA_ORDER_158 get() = need(Nation.USA, "补给优先")
-    val USA_ORDER_INTEL get() = need(Nation.USA, "巡洋舰侦察机")
+    val USA_ORDER_INTEL get() = need(Nation.JAPAN, "巡洋舰侦察机")
     val USA_ORDER_FAST get() = need(Nation.USA, "生产令")
     val USA_ORDER_BOMB2 get() = need(Nation.USA, "低空扫射")
     val USA_TANK_SHERMAN get() = need(Nation.USA, "M4 谢尔曼")
     val USA_TANK_M4A2 get() = need(Nation.USA, "M4A1")
-    val UK_ORDER_SUPPRESS get() = need(Nation.GERMANY, "突然袭击")
+    val UK_ORDER_SUPPRESS get() = need(Nation.USA, "胁迫")
     val UK_ORDER_NAVAL get() = need(Nation.UK, "海军力量")
     val UK_ORDER_ARTY get() = need(Nation.UK, "炮击")
     val UK_ORDER_CONVOY get() = need(Nation.UK, "商船队")

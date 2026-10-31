@@ -235,7 +235,7 @@ class FullMatchIntegrationTest {
 
         e.attack(Side.P1, shock, armored)
         assertEquals("冲击抵消反击，攻方不掉血", CardPool.SHOCK_USSR.defense, shock.defense)
-        assertEquals("3 攻被重甲 1 抵掉 1，掉 2", 2, armored.damage)
+        assertEquals("攻击力合成为 3，重甲 2 抵掉 2，掉 1", 1, armored.damage)
         assertFalse("冲击已用掉", shock.shockAvailable)
 
         val ambusher = Fixture.place(e, Side.P2, CardPool.AMBUSH_JPN, Line.SUPPORT)

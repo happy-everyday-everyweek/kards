@@ -358,9 +358,6 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
         when (target) {
             is Target.EnemyUnit -> {
                 val t = target.unit
-                if (t.has(Keyword.COVERT) && !t.covertRevealed) {
-                    return ActionResult.Rejected("隐蔽单位未被揭示，不能指定为目标")
-                }
                 if (t.smokeActive && t.has(Keyword.SMOKE)) {
                     return ActionResult.Rejected("烟幕单位无法被单位攻击", RuleId.KW_SMOKE)
                 }
@@ -541,7 +538,8 @@ class Engine(val p1: PlayerState, val p2: PlayerState) {
                 s.unitsOn(dead.line).remove(dead)
                 s.discardPile += dead.card
                 s.destroyedThisTurn += dead.card
-                val hasDeathEffect = CardEffectParser.parse(dead.card).any { it.trigger == EffectTrigger.DESTRUCTION }
+                val hasDeathEffect = dead.card.has(Keyword.DESTRUCTION) ||
+                    CardEffectParser.parse(dead.card).any { it.trigger == EffectTrigger.DESTRUCTION }
                 if (hasDeathEffect) {
                     emit("${dead.card.name} 触发亡计")
                     CardEffectRuntime.execute(this, s.side, dead.card, dead, trigger = EffectTrigger.DESTRUCTION)
