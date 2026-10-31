@@ -106,7 +106,8 @@ fun CampaignDetailScreen(
     var selectedStrategyId by remember(campaign.id) {
         mutableStateOf(progress.strategy(campaign.id) ?: campaign.strategies.first().id)
     }
-    val strategy = campaign.strategies.first { it.id == selectedStrategyId }
+    val strategy = campaign.strategies.firstOrNull { it.id == selectedStrategyId }
+        ?: campaign.strategies.first()
     var revision by remember { mutableIntStateOf(0) }
     revision
     Scaffold(topBar = {

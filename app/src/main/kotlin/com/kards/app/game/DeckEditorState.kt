@@ -56,7 +56,8 @@ class DeckEditorState(context: Context, initialNation: Nation = Nation.GERMANY) 
         prefs.edit().putString("ids", cards.joinToString(",") { it.id }).apply()
     }
 
-    fun toDeck(): Deck? = if (isReady) Deck(nation, CardPool.hqFor(nation), cards.toList()).also {
-        check(com.kards.core.DeckValidator.isValid(it)) { "卡组不符合构筑规则" }
+    fun toDeck(): Deck? = if (isReady) {
+        Deck(nation, CardPool.hqFor(nation), cards.toList())
+            .takeIf { com.kards.core.DeckValidator.isValid(it) }
     } else null
 }

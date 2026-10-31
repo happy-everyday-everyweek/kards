@@ -44,9 +44,9 @@ data class Campaign(
 
 private fun stages(prefix: String, rewards: List<String>): List<Mission> = listOf(
     Mission(1, "$prefix · 第一阶段", "突破外围防线，摧毁敌军总部。", MissionGoal.DESTROY_HQ, 0, rewards[0]),
-    Mission(2, "$prefix · 第二阶段", "夺取前线并累计控制 3 个回合。", MissionGoal.CONTROL_FRONT, 2, rewards[1]),
-    Mission(3, "$prefix · 第三阶段", "消灭 8 个敌方单位，瓦解其战斗群。", MissionGoal.DESTROY_UNITS, 3, rewards[2]),
-    Mission(4, "$prefix · 第四阶段", "在增援抵达前坚守 8 个回合。", MissionGoal.SURVIVE, 4, rewards[3]),
+    Mission(2, "$prefix · 第二阶段", "扩大突破口，摧毁敌军总部。", MissionGoal.DESTROY_HQ, 2, rewards[1]),
+    Mission(3, "$prefix · 第三阶段", "顶住反扑，摧毁敌军总部。", MissionGoal.DESTROY_HQ, 3, rewards[2]),
+    Mission(4, "$prefix · 第四阶段", "在增援抵达前摧毁敌军总部。", MissionGoal.DESTROY_HQ, 4, rewards[3]),
     Mission(5, "$prefix · 最终阶段", "面对强化总部，完成最后一击。", MissionGoal.DESTROY_HQ, 8, rewards[4])
 )
 
