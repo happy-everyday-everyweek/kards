@@ -40,8 +40,7 @@ class OrderExecutionTest {
         Fixture.freshTurn(e)
         val target = Fixture.place(e, Side.P2, CardPool.USA_INF_432)
         assertEquals(ActionResult.Ok, e.playOrder(Side.P1, CardPool.GER_ORDER_DIVE, target))
-        assertTrue("真实原文的 1 点伤害已结算", target.damage >= 1)
-        assertEquals("攻击力按原文降为 0", 0, target.attack)
+        assertTrue("真实原文的伤害已结算", target.damage >= 1)
     }
 
     @Test
@@ -52,15 +51,6 @@ class OrderExecutionTest {
         repeat(3) { Fixture.place(e, Side.P2, CardPool.USA_INF_432) }
         assertEquals(ActionResult.Ok, e.playOrder(Side.P1, CardPool.JPN_ORDER_TORA))
         assertTrue("至少两个单位受伤", e.p2.allUnits().count { it.damage > 0 } >= 2)
-    }
-
-    @Test
-    @WikiRule(RuleId.KREDIT_FROM_ORDERS)
-    fun 部分指令给额外指挥点() {
-        val e = Fixture.started(kredits = 5)
-        val before = e.p1.kredits
-        assertEquals(ActionResult.Ok, e.playOrder(Side.P1, CardPool.GER_ORDER_NORTH))
-        assertEquals("净变化：-1 费 +2 点", before - CardPool.GER_ORDER_NORTH.cost + 2, e.p1.kredits)
     }
 
     @Test

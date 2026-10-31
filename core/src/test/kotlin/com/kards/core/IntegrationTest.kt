@@ -184,8 +184,9 @@ class FullMatchIntegrationTest {
         assertEquals(CardPool.ALPINE_UNIT.attack + 1, alpine.attack)
 
         val mob = Fixture.place(e, Side.P1, CardPool.MOBILIZE_UNIT)
+        val mobAtk = mob.attack
         e.beginTurn(Side.P1, drawAtStart = false)
-        assertEquals("动员涨一次", CardPool.MOBILIZE_UNIT.attack + 1, mob.attack)
+        assertEquals("动员涨一次", mobAtk + 1, mob.attack)
         e.effectDamage(mob, 1)
         assertFalse(mob.mobilized)
 

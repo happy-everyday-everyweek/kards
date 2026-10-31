@@ -163,7 +163,7 @@ object CardPool {
     val ALPINE_UNIT get() = need(Nation.ITALY, "第2山地团").copy(keywords = setOf(Keyword.ALPINE))
 
     /** 动员单位。 */
-    val MOBILIZE_UNIT get() = need(Nation.FRANCE, "第2旅").copy(keywords = setOf(Keyword.MOBILIZE))
+    val MOBILIZE_UNIT get() = need(Nation.GERMANY, "第1步兵团").copy(keywords = setOf(Keyword.MOBILIZE))
 
     /** 指令与反制。 */
     val ORDER_DIVE get() = need(Nation.GERMANY, "俯冲轰炸")

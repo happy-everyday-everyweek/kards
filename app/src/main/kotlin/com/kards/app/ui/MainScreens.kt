@@ -161,7 +161,7 @@ fun CampaignDetailScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(mission.brief, style = MaterialTheme.typography.bodySmall)
-                        Text("目标：${mission.goal.cn} · 奖励：${mission.reward}",
+                        Text("目标：${mission.goal.cn} · " + if (stars > 0) "奖励已领取：${mission.reward}" else "奖励：${mission.reward}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary)
                     }
